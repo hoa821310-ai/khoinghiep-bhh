@@ -1,0 +1,48 @@
+{
+  "rules_version": "2",
+  "collections": [
+    {
+      "name": "products",
+      "description": "Products listed for sale",
+      "fields": [
+        { "name": "name", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "price", "type": "number" },
+        { "name": "imageUrl", "type": "string" },
+        { "name": "sellerId", "type": "string" },
+        { "name": "saleTime", "type": "timestamp" },
+        { "name": "status", "type": "string" },
+        { "name": "createdAt", "type": "timestamp" },
+        { "name": "updatedAt", "type": "timestamp" }
+      ]
+    },
+    {
+      "name": "orders",
+      "description": "Orders placed by buyers",
+      "fields": [
+        { "name": "productId", "type": "string" },
+        { "name": "sellerId", "type": "string" },
+        { "name": "buyerId", "type": "string" },
+        { "name": "buyerName", "type": "string" },
+        { "name": "buyerClass", "type": "string" },
+        { "name": "buyerPhone", "type": "string" },
+        { "name": "deliveryLocation", "type": "string" },
+        { "name": "deliveryAddress", "type": "string" },
+        { "name": "note", "type": "string" },
+        { "name": "orderedAt", "type": "timestamp" },
+        { "name": "orderStatus", "type": "string" }
+      ]
+    },
+    {
+      "name": "users",
+      "description": "User profiles",
+      "fields": [
+        { "name": "role", "type": "string" },
+        { "name": "name", "type": "string" },
+        { "name": "className", "type": "string" },
+        { "name": "phone", "type": "string" },
+        { "name": "createdAt", "type": "timestamp" }
+      ]
+    }
+  ]
+}

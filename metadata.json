@@ -1,0 +1,8 @@
+{
+  "name": "CLB Khởi Nghiệp - Chợ Độc Bản",
+  "description": "Sàn thương mại điện tử dành cho học sinh THPT Bình Hưng Hoà của CLB Khởi Nghiệp của trường",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
