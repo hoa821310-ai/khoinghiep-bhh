@@ -129,7 +129,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavClick, onOpenSellerLogin })
           <p>© 2026 CLB Khởi Nghiệp. Bản quyền thuộc về CLB.</p>
           <p className="flex flex-wrap items-center justify-center sm:justify-end gap-x-2 gap-y-0.5 text-center sm:text-right">
             <span>
-              Được lên ý tưởng bởi Phạm Ngọc Hân – 11B7 <span className="hidden sm:inline text-[#DED8C5]">|</span><br className="sm:hidden" /> Được xây dựng và phát triển bởi Phạm Thị Thuỳ Dương – 11B7, THPT BHH
+              Ý tưởng & Định hướng: Phạm Ngọc Hân – 11B7 <span className="hidden sm:inline text-[#DED8C5]">|</span><br className="sm:hidden" /> Xây dựng & Phát triển: Phạm Thị Thuỳ Dương – 11B7
             </span>
             <Heart className="w-3.5 h-3.5 text-[#F28C38] fill-[#F28C38] shrink-0 inline-block ml-0.5" />
           </p>
