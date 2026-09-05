@@ -5,6 +5,7 @@ import { formatVND, formatPhoneDisplay } from '../utils/dateUtils';
 import { getProductSaleState, calculateRemainingTime, formatVietnamTime } from '../utils/timeUtils';
 import { OrderStatusBadge, ProductBadge } from './Badges';
 import { StampOneOfOne } from './BotanicalDecorations';
+import { ResetTestDataModal } from './ResetTestDataModal';
 import {
   LayoutDashboard,
   Package,
@@ -24,7 +25,9 @@ import {
   ShieldCheck,
   Filter,
   DollarSign,
-  Timer
+  Timer,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 
@@ -57,6 +60,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
   const [phoneInput, setPhoneInput] = useState(sellerContactPhone);
   const [phoneSuccess, setPhoneSuccess] = useState('');
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   // Protect route
   if (!currentUser || currentUser.role !== 'SELLER') {
@@ -138,13 +142,25 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
           </h1>
         </div>
 
-        <button
-          onClick={onOpenAddProductModal}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#6C9A4A] hover:bg-[#405B32] text-white font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Đăng sản phẩm độc bản mới</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsResetModalOpen(true)}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-3 rounded-2xl bg-[#A03045]/10 hover:bg-[#A03045]/20 text-[#A03045] border border-[#A03045]/30 font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+            title="Reset sạch dữ liệu thử nghiệm để chuẩn bị vận hành chính thức"
+          >
+            <RotateCcw className="w-4 h-4 text-[#A03045]" />
+            <span>Reset dữ liệu test</span>
+          </button>
+
+          <button
+            onClick={onOpenAddProductModal}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#6C9A4A] hover:bg-[#405B32] text-white font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Đăng sản phẩm độc bản mới</span>
+          </button>
+        </div>
       </div>
 
       {/* Navigation Tabs */}
@@ -759,8 +775,45 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
               Lưu thay đổi Hotline
             </button>
           </form>
+
+          {/* Reset Test Data Operations Card */}
+          <div className="mt-8 pt-6 border-t border-[#DED8C5] space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#A03045]/15 text-[#A03045] flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-[#A03045]" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-heading font-extrabold text-base text-[#283124]">
+                  Chuyển giao vận hành: Reset toàn bộ dữ liệu test
+                </h4>
+                <p className="text-xs text-[#707766] mt-0.5">
+                  Xóa toàn bộ sản phẩm và đơn hàng đã tạo trong giai đoạn thử nghiệm để đưa website vào hoạt động chính thức với dữ liệu thật.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#A03045]/10 border border-[#A03045]/20 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-xs text-[#802030]">
+                <span>Hiện tại có: <strong>{products.length} sản phẩm</strong> và <strong>{orders.length} đơn hàng</strong></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-[#A03045] hover:bg-[#802030] text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Mở hộp thoại Reset</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Reset Test Data Modal */}
+      <ResetTestDataModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+      />
 
     </div>
   );

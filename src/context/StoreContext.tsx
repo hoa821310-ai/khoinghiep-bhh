@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { User, Product, Order, OrderItem, PickupMethod, OrderStatus, RealtimeNotification, RealtimeConnectionStatus } from '../types';
 import { getNextWorkingDay } from '../utils/dateUtils';
 import { db, auth } from '../firebase';
-import { collection, doc, onSnapshot, query, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, getDoc, orderBy, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, getDoc, getDocs, writeBatch, orderBy, where } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 
 interface StoreContextType {
@@ -27,6 +27,7 @@ interface StoreContextType {
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'status' | 'createdBy'>) => Promise<Product>;
   updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
+  resetTestData: () => Promise<{ success: boolean; deletedProducts: number; deletedOrders: number; message?: string }>;
   addToCart: (product: Product) => { success: boolean; message?: string };
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
@@ -241,8 +242,88 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteProduct = async (id: string) => {
-    await deleteDoc(doc(db, 'products', id));
-    setCart(prev => prev.filter(p => p.id !== id));
+    if (!currentUser || currentUser.role !== 'SELLER') {
+      throw new Error('Chỉ tài khoản Nhà bán hàng mới có quyền xóa sản phẩm.');
+    }
+
+    try {
+      // 1. Find all orders containing this product
+      const ordersSnap = await getDocs(collection(db, 'orders'));
+      const matchingOrderIds: string[] = [];
+      ordersSnap.forEach(oDoc => {
+        const oData = oDoc.data() as Order;
+        if (oData.items && oData.items.some(it => it.productId === id)) {
+          matchingOrderIds.push(oDoc.id);
+        }
+      });
+
+      // 2. Perform batched deletion of product and associated orders
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'products', id));
+      matchingOrderIds.forEach(orderId => {
+        batch.delete(doc(db, 'orders', orderId));
+      });
+      await batch.commit();
+
+      // 3. Clean up client cart state
+      setCart(prev => prev.filter(p => p.id !== id));
+    } catch (err: any) {
+      console.error('Delete product and associated orders error:', err);
+      throw err;
+    }
+  };
+
+  const resetTestData = async (): Promise<{ success: boolean; deletedProducts: number; deletedOrders: number; message?: string }> => {
+    if (!currentUser || currentUser.role !== 'SELLER') {
+      return {
+        success: false,
+        deletedProducts: 0,
+        deletedOrders: 0,
+        message: 'Chỉ tài khoản Nhà bán hàng (Ban Quản trị CLB) mới có quyền thực hiện Reset dữ liệu test.'
+      };
+    }
+
+    try {
+      // 1. Fetch all products and orders from Firestore
+      const [productsSnap, ordersSnap] = await Promise.all([
+        getDocs(collection(db, 'products')),
+        getDocs(collection(db, 'orders'))
+      ]);
+
+      const docRefsToDelete: any[] = [];
+      productsSnap.forEach(d => docRefsToDelete.push(d.ref));
+      ordersSnap.forEach(d => docRefsToDelete.push(d.ref));
+
+      const productsCount = productsSnap.size;
+      const ordersCount = ordersSnap.size;
+
+      // 2. Batched deletions in safe chunk size <= 400
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < docRefsToDelete.length; i += CHUNK_SIZE) {
+        const chunk = docRefsToDelete.slice(i, i + CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach(ref => batch.delete(ref));
+        await batch.commit();
+      }
+
+      // 3. Clear local shopping cart and notifications
+      setCart([]);
+      setRealtimeNotification(null);
+
+      return {
+        success: true,
+        deletedProducts: productsCount,
+        deletedOrders: ordersCount
+      };
+    } catch (err: any) {
+      console.error('Reset test data error:', err);
+      return {
+        success: false,
+        deletedProducts: 0,
+        deletedOrders: 0,
+        message: err.message || 'Lỗi khi xóa dữ liệu trên hệ thống Firestore.'
+      };
+    }
   };
 
   const addToCart = (product: Product) => {
@@ -365,7 +446,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       products, orders, currentUser, cart, sellerContactPhone, serverTime, isTimeSynced,
       realtimeStatus, realtimeNotification, dismissRealtimeNotification,
       loginBuyer, registerBuyer, verifySellerStep1, verifySellerStep2, logout,
-      updateUserProfile, updateSellerPhone, addProduct, updateProduct, deleteProduct,
+      updateUserProfile, updateSellerPhone, addProduct, updateProduct, deleteProduct, resetTestData,
       addToCart, removeFromCart, clearCart, createOrder, updateOrderStatus,
       getMarketplaceProducts, getUserOrders, refreshData
     }}>

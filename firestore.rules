@@ -29,8 +29,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.customerId || isSeller());
       allow create: if isAuthenticated() && request.auth.uid == request.resource.data.customerId;
-      allow update: if isSeller();
-      allow delete: if false;
+      allow update, delete: if isSeller();
     }
   }
 }
