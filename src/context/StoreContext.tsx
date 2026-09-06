@@ -274,30 +274,42 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const resetTestData = async (): Promise<{ success: boolean; deletedProducts: number; deletedOrders: number; message?: string }> => {
-    if (!currentUser || currentUser.role !== 'SELLER') {
+    // Bước 1 — Kiểm tra đăng nhập Firebase
+    if (!auth.currentUser) {
       return {
         success: false,
         deletedProducts: 0,
         deletedOrders: 0,
-        message: 'Chỉ tài khoản Nhà bán hàng (Ban Quản trị CLB) mới có quyền thực hiện Reset dữ liệu test.'
+        message: 'Phiên đăng nhập Firebase đã hết. Vui lòng đăng nhập lại.'
       };
     }
 
     try {
-      // 1. Fetch all products and orders from Firestore
+      // Bước 2 — Kiểm tra quyền SELLER trực tiếp trên Firestore
+      const userDocSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      if (!userDocSnap.exists() || userDocSnap.data()?.role !== 'SELLER') {
+        return {
+          success: false,
+          deletedProducts: 0,
+          deletedOrders: 0,
+          message: 'Bạn không có quyền thực hiện thao tác này. Chỉ tài khoản Người bán (Ban Quản trị CLB) mới có quyền Reset dữ liệu test.'
+        };
+      }
+
+      // Bước 3 — Đọc dữ liệu trực tiếp từ Firestore (Source of Truth)
       const [productsSnap, ordersSnap] = await Promise.all([
         getDocs(collection(db, 'products')),
         getDocs(collection(db, 'orders'))
       ]);
 
+      const initialProductsCount = productsSnap.size;
+      const initialOrdersCount = ordersSnap.size;
+
       const docRefsToDelete: any[] = [];
       productsSnap.forEach(d => docRefsToDelete.push(d.ref));
       ordersSnap.forEach(d => docRefsToDelete.push(d.ref));
 
-      const productsCount = productsSnap.size;
-      const ordersCount = ordersSnap.size;
-
-      // 2. Batched deletions in safe chunk size <= 400
+      // Bước 4 — Xóa toàn bộ products và orders theo batch CHUNK_SIZE = 400
       const CHUNK_SIZE = 400;
       for (let i = 0; i < docRefsToDelete.length; i += CHUNK_SIZE) {
         const chunk = docRefsToDelete.slice(i, i + CHUNK_SIZE);
@@ -306,22 +318,50 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await batch.commit();
       }
 
-      // 3. Clear local shopping cart and notifications
+      // Bước 5 — Xóa Cart và localStorage liên quan đến giỏ hàng
       setCart([]);
+      try {
+        localStorage.removeItem('clb_cart');
+      } catch (e) {
+        console.warn('Cannot clear local cart cache:', e);
+      }
+
+      // Bước 6 — Reset Realtime React State
+      setProducts([]);
+      setOrders([]);
       setRealtimeNotification(null);
+
+      // Bước 7 — Kiểm tra lại Firestore sau khi xóa (Post-deletion verification)
+      const [verifyProductsSnap, verifyOrdersSnap] = await Promise.all([
+        getDocs(collection(db, 'products')),
+        getDocs(collection(db, 'orders'))
+      ]);
+
+      if (verifyProductsSnap.size > 0 || verifyOrdersSnap.size > 0) {
+        return {
+          success: false,
+          deletedProducts: initialProductsCount - verifyProductsSnap.size,
+          deletedOrders: initialOrdersCount - verifyOrdersSnap.size,
+          message: `Reset chưa hoàn tất. Firestore vẫn còn ${verifyProductsSnap.size} sản phẩm và ${verifyOrdersSnap.size} đơn hàng.`
+        };
+      }
 
       return {
         success: true,
-        deletedProducts: productsCount,
-        deletedOrders: ordersCount
+        deletedProducts: initialProductsCount,
+        deletedOrders: initialOrdersCount
       };
     } catch (err: any) {
-      console.error('Reset test data error:', err);
+      console.error('RESET TEST DATA ERROR:', err);
+      let customMsg = err?.message || 'Lỗi khi xóa dữ liệu trên hệ thống Firestore.';
+      if (err?.code === 'permission-denied' || (err?.message && err.message.includes('permission-denied'))) {
+        customMsg = 'Firestore từ chối quyền xóa. Hãy kiểm tra tài khoản SELLER và Firestore Rules.';
+      }
       return {
         success: false,
         deletedProducts: 0,
         deletedOrders: 0,
-        message: err.message || 'Lỗi khi xóa dữ liệu trên hệ thống Firestore.'
+        message: customMsg
       };
     }
   };
