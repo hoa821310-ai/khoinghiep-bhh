@@ -1,6 +1,6 @@
 import React from 'react';
 import { LeafIllustration, FlowerIllustration, StarSparkle } from './BotanicalDecorations';
-import { Sparkles, ArrowRight, ShieldCheck, Heart, Calendar, Clock } from 'lucide-react';
+import { ArrowRight, Heart, Calendar, Clock } from 'lucide-react';
 
 interface HeroProps {
   onExplore: () => void;

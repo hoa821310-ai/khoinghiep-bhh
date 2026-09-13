@@ -425,7 +425,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={sellerEmail}
                     onChange={e => setSellerEmail(e.target.value)}
                     required
-                    placeholder="email@clbkhoinghiep.com"
                     className="w-full pl-9 pr-3 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#405B32]"
                   />
                 </div>
@@ -439,7 +438,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <Lock className="w-4 h-4 text-[#707766] absolute left-3 top-3" />
                   <input
                     type={showSellerPassword ? "text" : "password"}
-                    placeholder="••••••••••••"
                     value={sellerPassword}
                     onChange={e => setSellerPassword(e.target.value)}
                     required
