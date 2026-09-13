@@ -19,7 +19,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   customNotice,
   onSuccess
 }) => {
-  const { loginBuyer, registerBuyer, verifySellerStep1, verifySellerStep2 } = useStore();
+  const { loginBuyer, loginSeller, registerBuyer } = useStore();
 
   // Active Tab: 'BUYER' or 'SELLER'
   const [accountType, setAccountType] = useState<'BUYER' | 'SELLER'>(
@@ -31,11 +31,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     initialMode === 'buyer-register' ? 'register' : 'login'
   );
 
-  // Seller 2-step verification state
-  const [sellerStep, setSellerStep] = useState<1 | 2>(1);
+  // Seller login state
   const [sellerEmail, setSellerEmail] = useState('');
   const [sellerPassword, setSellerPassword] = useState('');
-  const [sellerSecurityAnswer, setSellerSecurityAnswer] = useState('');
+  const [isSellerSubmitting, setIsSellerSubmitting] = useState(false);
 
   // Buyer Form fields
   const [buyerName, setBuyerName] = useState('');
@@ -55,10 +54,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const resetForm = () => {
     setErrorMessage('');
     setSuccessMessage('');
-    setSellerStep(1);
     setSellerEmail('');
     setSellerPassword('');
-    setSellerSecurityAnswer('');
+    setIsSellerSubmitting(false);
   };
 
   const handleBuyerSubmit = async (e: React.FormEvent) => {
@@ -130,42 +128,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleSellerStep1Submit = (e: React.FormEvent) => {
+  const handleSellerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    if (!sellerEmail || !sellerPassword) {
-      setErrorMessage('Vui lòng nhập email và mật khẩu nhà bán hàng.');
+    setSuccessMessage('');
+    if (!sellerEmail.trim() || !sellerPassword) {
+      setErrorMessage('Vui lòng nhập đầy đủ Email và Mật khẩu nhà bán hàng.');
       return;
     }
 
-    const res = verifySellerStep1(sellerEmail, sellerPassword);
-    if (res.success) {
-      // Proceed to Step 2
-      setSellerStep(2);
-      setErrorMessage('');
-    } else {
-      setErrorMessage(res.message || 'Đăng nhập không thành công. Thông tin không chính xác.');
-    }
-  };
+    setIsSellerSubmitting(true);
+    const res = await loginSeller(sellerEmail, sellerPassword);
+    setIsSellerSubmitting(false);
 
-  const handleSellerStep2Submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-    if (!sellerSecurityAnswer.trim()) {
-      setErrorMessage('Vui lòng nhập câu trả lời xác thực.');
-      return;
-    }
-
-    const res = verifySellerStep2(sellerSecurityAnswer);
     if (res.success) {
-      setSuccessMessage('Xác thực 2 lớp thành công! Đang chuyển đến Dashboard CLB...');
+      setSuccessMessage('Đăng nhập Ban Quản Trị thành công! Đang vào Dashboard...');
       setTimeout(() => {
         onClose();
         onSuccess?.();
         resetForm();
-      }, 700);
+      }, 600);
     } else {
-      setErrorMessage(res.message || 'Câu trả lời xác thực không chính xác.');
+      setErrorMessage(res.message || 'Đăng nhập không thành công. Thông tin không chính xác.');
     }
   };
 
@@ -416,131 +400,76 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
-        {/* ----------------- SELLER 2-LAYER AUTH FLOW ----------------- */}
+        {/* ----------------- SELLER AUTH FLOW ----------------- */}
         {accountType === 'SELLER' && (
           <div>
-            <div className="mb-4 p-3 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs text-[#707766]">
+            <div className="mb-4 p-3.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs text-[#707766]">
               <div className="flex items-center gap-2 font-bold text-[#405B32] mb-1">
                 <ShieldCheck className="w-4 h-4 text-[#6C9A4A]" />
-                <span>Xác thực 2 lớp bảo mật Ban Quản Trị</span>
+                <span>Đăng nhập Ban Quản Trị CLB</span>
               </div>
               <p className="text-[11px] leading-relaxed">
-                Tài khoản nhà bán hàng được thiết lập cố định cho CLB Khởi Nghiệp. Không cho phép đăng ký mới.
+                Khu vực dành riêng cho Người bán / Ban Chủ nhiệm CLB Khởi Nghiệp. Quyền truy cập được xác thực trực tiếp qua Firebase Authentication và phân quyền hệ thống.
               </p>
             </div>
 
-            {/* Step 1: Email & Password */}
-            {sellerStep === 1 && (
-              <form onSubmit={handleSellerStep1Submit} className="space-y-3.5">
-                <div className="text-xs font-bold text-[#405B32] flex items-center gap-1.5 mb-1">
-                  <span className="w-5 h-5 rounded-full bg-[#6C9A4A] text-white flex items-center justify-center text-[10px]">1</span>
-                  <span>Lớp 1 — Email & Mật khẩu CLB</span>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#283124] mb-1">
-                    Email Nhà bán hàng
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-[#707766] absolute left-3 top-3" />
-                    <input
-                      type="email"
-                      value={sellerEmail}
-                      onChange={e => setSellerEmail(e.target.value)}
-                      required
-                      className="w-full pl-9 pr-3 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#405B32]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#283124] mb-1">
-                    Mật khẩu Lớp 1
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-[#707766] absolute left-3 top-3" />
-                    <input
-                      type={showSellerPassword ? "text" : "password"}
-                      placeholder="••••••••••••"
-                      value={sellerPassword}
-                      onChange={e => setSellerPassword(e.target.value)}
-                      required
-                      className="w-full pl-9 pr-10 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#405B32]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSellerPassword(!showSellerPassword)}
-                      className="absolute right-3 top-2.5 text-[#707766] hover:text-[#283124] transition-colors focus:outline-none"
-                    >
-                      {showSellerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 mt-3 bg-[#405B32] hover:bg-[#283124] text-white font-bold rounded-2xl text-sm transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span>Tiếp tục sang Lớp 2</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
-            )}
-
-            {/* Step 2: Secret Question */}
-            {sellerStep === 2 && (
-              <form onSubmit={handleSellerStep2Submit} className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                <div className="text-xs font-bold text-[#405B32] flex items-center gap-1.5 mb-1">
-                  <span className="w-5 h-5 rounded-full bg-[#6C9A4A] text-white flex items-center justify-center text-[10px]">2</span>
-                  <span>Lớp 2 — Câu hỏi xác thực nội bộ CLB</span>
-                </div>
-
-                <div className="p-3.5 bg-[#F4C542]/20 border border-[#F4C542]/40 rounded-2xl">
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#8C5D00] mb-1">
-                    <HelpCircle className="w-4 h-4" />
-                    <span>Câu hỏi bảo mật:</span>
-                  </div>
-                  <p className="text-sm font-extrabold text-[#283124] font-heading">
-                    “Ngọc Hân thích ăn gì?”
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#283124] mb-1">
-                    Nhập câu trả lời chính xác <span className="text-[#A03045]">*</span>
-                  </label>
+            <form onSubmit={handleSellerSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-[#283124] mb-1">
+                  Email Nhà bán hàng
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-[#707766] absolute left-3 top-3" />
                   <input
-                    type="text"
-                    placeholder="Nhập câu trả lời..."
-                    value={sellerSecurityAnswer}
-                    onChange={e => setSellerSecurityAnswer(e.target.value)}
+                    type="email"
+                    value={sellerEmail}
+                    onChange={e => setSellerEmail(e.target.value)}
                     required
-                    autoFocus
-                    className="w-full px-3.5 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#405B32]"
+                    placeholder="email@clbkhoinghiep.com"
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#405B32]"
                   />
                 </div>
+              </div>
 
-                <div className="flex items-center gap-2 pt-2">
+              <div>
+                <label className="block text-xs font-bold text-[#283124] mb-1">
+                  Mật khẩu Nhà bán hàng
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-[#707766] absolute left-3 top-3" />
+                  <input
+                    type={showSellerPassword ? "text" : "password"}
+                    placeholder="••••••••••••"
+                    value={sellerPassword}
+                    onChange={e => setSellerPassword(e.target.value)}
+                    required
+                    className="w-full pl-9 pr-10 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#405B32]"
+                  />
                   <button
                     type="button"
-                    onClick={() => {
-                      setSellerStep(1);
-                      setErrorMessage('');
-                    }}
-                    className="w-1/3 py-2.5 bg-[#F8F1DF] hover:bg-[#DED8C5] text-[#283124] font-bold rounded-2xl text-xs transition-colors cursor-pointer"
+                    onClick={() => setShowSellerPassword(!showSellerPassword)}
+                    className="absolute right-3 top-2.5 text-[#707766] hover:text-[#283124] transition-colors focus:outline-none cursor-pointer"
                   >
-                    Quay lại
-                  </button>
-                  <button
-                    type="submit"
-                    className="w-2/3 py-2.5 bg-[#405B32] hover:bg-[#283124] text-white font-bold rounded-2xl text-xs sm:text-sm transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Xác thực & Vào Dashboard</span>
+                    {showSellerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </form>
-            )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSellerSubmitting}
+                className="w-full py-3 mt-3 bg-[#405B32] hover:bg-[#283124] text-white font-bold rounded-2xl text-sm transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSellerSubmitting ? (
+                  <span>Đang xác thực...</span>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Đăng nhập Ban Quản Trị</span>
+                  </>
+                )}
+              </button>
+            </form>
           </div>
         )}
 

@@ -18,9 +18,8 @@ interface StoreContextType {
   realtimeNotification: RealtimeNotification | null;
   dismissRealtimeNotification: () => void;
   loginBuyer: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>;
+  loginSeller: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>;
   registerBuyer: (data: { name: string; className: string; phoneNumber: string; email: string; password: string; }) => Promise<{ success: boolean; message?: string }>;
-  verifySellerStep1: (email: string, pass: string) => { success: boolean; message?: string };
-  verifySellerStep2: (answer: string) => { success: boolean; message?: string };
   logout: () => void;
   updateUserProfile: (data: { name: string; className: string; phoneNumber: string }) => void;
   updateSellerPhone: (phone: string) => void;
@@ -38,10 +37,6 @@ interface StoreContextType {
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
-
-// FIXED SELLER CREDENTIALS (Temporary fallback if no Firebase user doc found)
-const SELLER_FIXED_EMAIL = 'thuyduongpham7813@gmail.com';
-const SELLER_FIXED_PASS = 'Matkhau1234@khoinghiep';
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -76,20 +71,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (userDoc.exists()) {
           setCurrentUser(userDoc.data() as User);
         } else {
-          // If seller logging in with fixed email, create their doc
-          if (firebaseUser.email === SELLER_FIXED_EMAIL) {
-            const sellerUser: User = {
-              id: firebaseUser.uid,
-              name: 'CLB Khởi Nghiệp',
-              email: SELLER_FIXED_EMAIL,
-              className: 'CLB Khởi Nghiệp',
-              phoneNumber: '0974900849',
-              role: 'SELLER',
-              createdAt: new Date().toISOString()
-            };
-            await setDoc(doc(db, 'users', firebaseUser.uid), sellerUser);
-            setCurrentUser(sellerUser);
-          }
+          setCurrentUser(null);
         }
       } else {
         setCurrentUser(null);
@@ -178,44 +160,42 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Seller 2-step verification logic
-  const [tempSellerCred, setTempSellerCred] = useState<any>(null);
-  
-  const verifySellerStep1 = (email: string, pass: string) => {
-    if (email === SELLER_FIXED_EMAIL && pass === SELLER_FIXED_PASS) {
-      setTempSellerCred({ email, pass });
+  const loginSeller = async (email: string, pass: string) => {
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+      const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+      if (!userDoc.exists() || userDoc.data()?.role !== 'SELLER') {
+        await signOut(auth);
+        return { success: false, message: 'Tài khoản này không có quyền Người bán (SELLER).' };
+      }
+      setCurrentUser(userDoc.data() as User);
       return { success: true };
+    } catch (err: any) {
+      console.error("Seller login error:", err);
+      let errorMsg = 'Sai email hoặc mật khẩu nhà bán hàng.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        errorMsg = 'Email hoặc mật khẩu nhà bán hàng không chính xác.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMsg = 'Quá nhiều lần thử thất bại. Vui lòng thử lại sau.';
+      }
+      return { success: false, message: errorMsg };
     }
-    return { success: false, message: 'Sai thông tin nhà bán hàng.' };
-  };
-
-  const verifySellerStep2 = (answer: string) => {
-    if (answer.toLowerCase().trim() === 'gì cũng ăn' && tempSellerCred) {
-      // Actually sign in to Firebase Auth
-      signInWithEmailAndPassword(auth, tempSellerCred.email, tempSellerCred.pass)
-        .catch(async (err) => {
-          if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-             try {
-                await createUserWithEmailAndPassword(auth, tempSellerCred.email, tempSellerCred.pass);
-             } catch(e) {
-                console.error("Failed to create seller:", e);
-             }
-          }
-        });
-      setTempSellerCred(null);
-      return { success: true };
-    }
-    return { success: false, message: 'Câu trả lời bảo mật không chính xác.' };
   };
 
   const logout = async () => {
     await signOut(auth);
+    setCurrentUser(null);
   };
 
-  const updateUserProfile = async (data: any) => {
+  const updateUserProfile = async (data: { name: string; className: string; phoneNumber: string }) => {
     if (currentUser) {
-      await updateDoc(doc(db, 'users', currentUser.id), data);
-      setCurrentUser({ ...currentUser, ...data });
+      const safeUpdates = {
+        name: data.name.trim(),
+        className: data.className.trim(),
+        phoneNumber: data.phoneNumber.trim()
+      };
+      await updateDoc(doc(db, 'users', currentUser.id), safeUpdates);
+      setCurrentUser({ ...currentUser, ...safeUpdates });
     }
   };
 
@@ -391,7 +371,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <StoreContext.Provider value={{
       products, orders, currentUser, cart, sellerContactPhone, serverTime, isTimeSynced,
       realtimeStatus, realtimeNotification, dismissRealtimeNotification,
-      loginBuyer, registerBuyer, verifySellerStep1, verifySellerStep2, logout,
+      loginBuyer, loginSeller, registerBuyer, logout,
       updateUserProfile, updateSellerPhone, addProduct, updateProduct, deleteProduct,
       addToCart, removeFromCart, clearCart, createOrder, updateOrderStatus,
       getMarketplaceProducts, getUserOrders, refreshData

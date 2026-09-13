@@ -7,29 +7,64 @@ service cloud.firestore {
     }
     
     function isSeller() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SELLER';
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SELLER';
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if request.auth.uid == userId;
+      // Users can only read their own profile; Sellers can read any user profile
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isSeller());
+      allow list: if isSeller();
+      
+      // User self-registration: strictly locked to BUYER role
+      allow create: if isAuthenticated() && 
+        request.auth.uid == userId && 
+        request.resource.data.role == 'BUYER' &&
+        request.resource.data.id == userId;
+      
+      // Profile update: cannot alter role, id, or email. Only allowed profile fields
+      allow update: if isAuthenticated() && 
+        request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'className', 'phoneNumber']);
+        
+      allow delete: if isSeller();
     }
     
     match /products/{productId} {
+      // Public catalog read for all visitors & buyers
       allow read: if true;
+      
+      // Only Seller can create or delete products
       allow create, delete: if isSeller();
+      
+      // Seller can update any field; Buyer can ONLY transition status from AVAILABLE to SOLD_OUT during purchase
       allow update: if isSeller() || (
         isAuthenticated() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
         resource.data.status == 'AVAILABLE' &&
-        request.resource.data.status == 'SOLD_OUT'
+        request.resource.data.status == 'SOLD_OUT' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldOutAt', 'updatedAt'])
       );
     }
     
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.customerId || isSeller());
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.customerId;
+      // Buyers can read their own orders; Sellers can read all orders
+      allow get: if isAuthenticated() && (request.auth.uid == resource.data.customerId || isSeller());
+      allow list: if isAuthenticated() && (isSeller() || resource.data.customerId == request.auth.uid);
+      
+      // Authenticated buyers can place orders with initial PENDING status
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.customerId &&
+        request.resource.data.status == 'PENDING';
+      
+      // Only Seller can update order status (e.g. PREPARING, COMPLETED, CANCELLED) or delete orders
       allow update, delete: if isSeller();
     }
   }
 }
+
