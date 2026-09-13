@@ -24,7 +24,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   onOpenAddProductModal,
   onEditProduct
 }) => {
-  const { currentUser, serverTime } = useStore();
+  const { currentUser, serverTime: clientLocalTime } = useStore();
   const [filter, setFilter] = useState<FilterStatus>('ALL');
 
   const filteredProducts = useMemo(() => {
@@ -37,7 +37,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
         if (!matchesName && !matchesDesc) return false;
       }
 
-      const saleState = getProductSaleState(product, serverTime);
+      const saleState = getProductSaleState(product, clientLocalTime);
 
       // Status filter
       if (filter === 'AVAILABLE') return saleState === 'AVAILABLE';
@@ -45,11 +45,11 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
       if (filter === 'SOLD_OUT') return saleState === 'SOLD_OUT';
       return true;
     });
-  }, [products, searchQuery, filter, serverTime]);
+  }, [products, searchQuery, filter, clientLocalTime]);
 
-  const availableCount = products.filter(p => getProductSaleState(p, serverTime) === 'AVAILABLE').length;
-  const upcomingCount = products.filter(p => getProductSaleState(p, serverTime) === 'UPCOMING').length;
-  const soldOutCount = products.filter(p => getProductSaleState(p, serverTime) === 'SOLD_OUT').length;
+  const availableCount = products.filter(p => getProductSaleState(p, clientLocalTime) === 'AVAILABLE').length;
+  const upcomingCount = products.filter(p => getProductSaleState(p, clientLocalTime) === 'UPCOMING').length;
+  const soldOutCount = products.filter(p => getProductSaleState(p, clientLocalTime) === 'SOLD_OUT').length;
 
   return (
     <section id="products-section" className="px-3 sm:px-6 py-6 sm:py-10 max-w-7xl mx-auto">

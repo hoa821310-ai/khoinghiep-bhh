@@ -45,7 +45,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [cart, setCart] = useState<Product[]>([]);
   const [sellerContactPhone, setSellerContactPhone] = useState<string>('0974 900 849');
   
-  const [serverTime, setServerTime] = useState<number>(Date.now());
+  const [clientLocalTime, setClientLocalTime] = useState<number>(Date.now());
   const [isTimeSynced, setIsTimeSynced] = useState<boolean>(true);
   
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeConnectionStatus>('connecting');
@@ -54,7 +54,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Sync server time locally
   useEffect(() => {
     const timer = setInterval(() => {
-      setServerTime(Date.now());
+      setClientLocalTime(Date.now());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -82,11 +82,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Realtime Firestore Listeners (Products)
   useEffect(() => {
-    setRealtimeStatus('connected');
-    
     // Products Listener (Publicly accessible)
     const qProducts = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
     const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+      setRealtimeStatus('connected');
       const prods: Product[] = [];
       snapshot.forEach(doc => prods.push(doc.data() as Product));
       setProducts(prods);
@@ -226,28 +225,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
-      // 1. Find all orders containing this product
-      const ordersSnap = await getDocs(collection(db, 'orders'));
-      const matchingOrderIds: string[] = [];
-      ordersSnap.forEach(oDoc => {
-        const oData = oDoc.data() as Order;
-        if (oData.items && oData.items.some(it => it.productId === id)) {
-          matchingOrderIds.push(oDoc.id);
-        }
-      });
-
-      // 2. Perform batched deletion of product and associated orders
-      const batch = writeBatch(db);
-      batch.delete(doc(db, 'products', id));
-      matchingOrderIds.forEach(orderId => {
-        batch.delete(doc(db, 'orders', orderId));
-      });
-      await batch.commit();
+      // Chỉ xóa sản phẩm, không xóa lịch sử đơn hàng
+      await deleteDoc(doc(db, 'products', id));
 
       // 3. Clean up client cart state
       setCart(prev => prev.filter(p => p.id !== id));
     } catch (err: any) {
-      console.error('Delete product and associated orders error:', err);
+      console.error('Delete product error:', err);
       throw err;
     }
   };
@@ -278,7 +262,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const unreleasedInCart = cart.filter(c => {
       const liveProduct = products.find(p => p.id === c.id) || c;
-      return liveProduct.openSaleTimestamp && liveProduct.openSaleTimestamp > serverTime;
+      return liveProduct.openSaleTimestamp && liveProduct.openSaleTimestamp > clientLocalTime;
     });
     if (unreleasedInCart.length > 0) {
       return { success: false, message: `Sản phẩm chưa mở bán.` };
@@ -316,13 +300,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const buyerPhone = (data.overridePhone || currentUser.phoneNumber).trim();
         const { fullDescription: expectedDate } = getNextWorkingDay(new Date());
 
-        const orderItems: OrderItem[] = cart.map(p => ({
-          productId: p.id,
-          productName: p.name,
-          price: p.price,
-          imageUrl: p.imageUrl || (p.images && p.images[0]) || '',
-          deliveryPeriod: p.deliveryPeriod || (p.deliveryPeriods && p.deliveryPeriods[0]) || 'Ra chơi sáng'
-        }));
+        const orderItems: OrderItem[] = productDocs.map((pDoc) => {
+          const p = pDoc.data() as Product;
+          return {
+            productId: p.id,
+            productName: p.name,
+            price: p.price,
+            imageUrl: p.imageUrl || (p.images && p.images[0]) || '',
+            deliveryPeriod: p.deliveryPeriod || (p.deliveryPeriods && p.deliveryPeriods[0]) || 'Ra chơi sáng'
+          };
+        });
 
         const totalAmount = orderItems.reduce((sum, item) => sum + item.price, 0);
         
@@ -369,7 +356,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   return (
     <StoreContext.Provider value={{
-      products, orders, currentUser, cart, sellerContactPhone, serverTime, isTimeSynced,
+      products, orders, currentUser, cart, sellerContactPhone, serverTime: clientLocalTime, isTimeSynced,
       realtimeStatus, realtimeNotification, dismissRealtimeNotification,
       loginBuyer, loginSeller, registerBuyer, logout,
       updateUserProfile, updateSellerPhone, addProduct, updateProduct, deleteProduct,

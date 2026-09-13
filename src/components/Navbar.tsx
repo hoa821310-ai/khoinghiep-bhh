@@ -21,12 +21,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   searchQuery,
   setSearchQuery
 }) => {
-  const { currentUser, cart, logout, serverTime, isTimeSynced, realtimeStatus, orders } = useStore();
+  const { currentUser, cart, logout, serverTime: clientLocalTime, isTimeSynced, realtimeStatus, orders } = useStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
 
-  const vnTime = formatVietnamTime(serverTime);
+  const vnTime = formatVietnamTime(clientLocalTime);
 
   const pendingOrdersCount = orders.filter(o => o.status === 'PENDING').length;
 

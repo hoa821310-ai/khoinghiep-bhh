@@ -45,7 +45,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
     updateOrderStatus,
     sellerContactPhone,
     updateSellerPhone,
-    serverTime,
+    serverTime: clientLocalTime,
     realtimeStatus
   } = useStore();
 
@@ -303,10 +303,10 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {products.map(product => {
-                const saleState = getProductSaleState(product, serverTime);
+                const saleState = getProductSaleState(product, clientLocalTime);
                 const isUpcoming = saleState === 'UPCOMING';
                 const countdown = product.openSaleTimestamp
-                  ? calculateRemainingTime(product.openSaleTimestamp, serverTime)
+                  ? calculateRemainingTime(product.openSaleTimestamp, clientLocalTime)
                   : null;
                 const vnTime = product.openSaleTimestamp
                   ? formatVietnamTime(product.openSaleTimestamp)

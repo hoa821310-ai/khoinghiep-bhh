@@ -17,7 +17,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   onOrderSuccess
 }) => {
-  const { currentUser, cart, createOrder, serverTime } = useStore();
+  const { currentUser, cart, createOrder, serverTime: clientLocalTime } = useStore();
   const { fullDescription: nextDeliveryDate } = getNextWorkingDay(new Date());
 
   // Steps: 'FORM' | 'REVIEW' | 'SUCCESS'
@@ -37,13 +37,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check upcoming items
-  const upcomingInCart = cart.filter(item => getProductSaleState(item, serverTime) === 'UPCOMING');
+  const upcomingInCart = cart.filter(item => getProductSaleState(item, clientLocalTime) === 'UPCOMING');
   const hasUpcoming = upcomingInCart.length > 0;
   const earliestUpcoming = upcomingInCart.length > 0
     ? upcomingInCart.reduce((prev, curr) => (prev.openSaleTimestamp || 0) < (curr.openSaleTimestamp || 0) ? prev : curr)
     : null;
   const earliestCountdown = earliestUpcoming?.openSaleTimestamp
-    ? calculateRemainingTime(earliestUpcoming.openSaleTimestamp, serverTime)
+    ? calculateRemainingTime(earliestUpcoming.openSaleTimestamp, clientLocalTime)
     : null;
   const earliestVnTime = earliestUpcoming?.openSaleTimestamp
     ? formatVietnamTime(earliestUpcoming.openSaleTimestamp)

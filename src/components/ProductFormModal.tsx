@@ -56,7 +56,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onClose,
   productToEdit
 }) => {
-  const { addProduct, updateProduct, deleteProduct, serverTime } = useStore();
+  const { addProduct, updateProduct, deleteProduct, serverTime: clientLocalTime } = useStore();
 
   const [name, setName] = useState('');
   const [price, setPrice] = useState<number | string>('');
@@ -110,11 +110,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCategory(productToEdit.category || 'Thủ công mỹ nghệ');
         
         // Parse opening schedule
-        const parsed = parseProductOpeningValues(productToEdit, serverTime);
+        const parsed = parseProductOpeningValues(productToEdit, clientLocalTime);
         setOpeningDate(parsed.dateStr);
         setOpeningHour(parsed.hour);
         setOpeningMinute(parsed.minute);
-        setIsImmediateSale(!productToEdit.openSaleTimestamp || productToEdit.openSaleTimestamp <= serverTime);
+        setIsImmediateSale(!productToEdit.openSaleTimestamp || productToEdit.openSaleTimestamp <= clientLocalTime);
 
         const existingImgs = productToEdit.images && productToEdit.images.length > 0
           ? productToEdit.images
@@ -139,7 +139,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setDescription('');
         setCategory('Thủ công mỹ nghệ');
         
-        const today = getTodayVietnamDateStr(serverTime);
+        const today = getTodayVietnamDateStr(clientLocalTime);
         setOpeningDate(today);
         setOpeningHour(9);
         setOpeningMinute(0);
@@ -151,22 +151,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setCustomSlot('');
       }
     }
-  }, [isOpen, productToEdit]); // CRITICAL: NEVER put serverTime here!
+  }, [isOpen, productToEdit]); // CRITICAL: NEVER put clientLocalTime here!
 
   if (!isOpen) return null;
 
   // Today and Tomorrow strings for quick buttons
-  const todayIso = getTodayVietnamDateStr(serverTime);
-  const tomorrowIso = getTomorrowVietnamDateStr(serverTime);
-  const dayAfterTomorrowIso = getTomorrowVietnamDateStr(serverTime + 24 * 60 * 60 * 1000);
+  const todayIso = getTodayVietnamDateStr(clientLocalTime);
+  const tomorrowIso = getTomorrowVietnamDateStr(clientLocalTime);
+  const dayAfterTomorrowIso = getTomorrowVietnamDateStr(clientLocalTime + 24 * 60 * 60 * 1000);
 
   // Calculate live preview timestamp based on selected date + hour + minute
   const computedTimestamp = isImmediateSale
-    ? serverTime - 1000
+    ? clientLocalTime - 1000
     : buildVietnamTimestamp(openingDate, openingHour, openingMinute);
 
   const previewVnTime = formatVietnamTime(computedTimestamp);
-  const previewCountdown = calculateRemainingTime(computedTimestamp, serverTime);
+  const previewCountdown = calculateRemainingTime(computedTimestamp, clientLocalTime);
 
   // Process File to lightweight permanent Base64 Data URL
   const processFileToBase64 = (file: File): Promise<string> => {
@@ -430,7 +430,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const numPrice = parseInt(price.toString().replace(/\D/g, ''), 10) || 0;
     const primaryImg = readyBase64List[primaryImageIndex] || readyBase64List[0];
 
-    const finalTimestamp = isImmediateSale ? serverTime : computedTimestamp;
+    const finalTimestamp = isImmediateSale ? clientLocalTime : computedTimestamp;
     const finalVnTime = formatVietnamTime(finalTimestamp);
     
     const finalOpeningAt = isImmediateSale 

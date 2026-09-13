@@ -16,7 +16,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onClose,
   onProceedToCheckout
 }) => {
-  const { cart, removeFromCart, clearCart, serverTime } = useStore();
+  const { cart, removeFromCart, clearCart, serverTime: clientLocalTime } = useStore();
   const { fullDescription: nextDeliveryDate } = getNextWorkingDay(new Date());
 
   if (!isOpen) return null;
@@ -25,7 +25,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Check if any cart items are UPCOMING
   const upcomingItems = cart.filter(item => {
-    return getProductSaleState(item, serverTime) === 'UPCOMING';
+    return getProductSaleState(item, clientLocalTime) === 'UPCOMING';
   });
 
   const hasUpcomingItems = upcomingItems.length > 0;
@@ -34,7 +34,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     : null;
 
   const earliestCountdown = earliestUpcoming?.openSaleTimestamp
-    ? calculateRemainingTime(earliestUpcoming.openSaleTimestamp, serverTime)
+    ? calculateRemainingTime(earliestUpcoming.openSaleTimestamp, clientLocalTime)
     : null;
 
   const earliestVnTime = earliestUpcoming?.openSaleTimestamp
@@ -135,10 +135,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     </div>
 
                     {items.map(item => {
-                      const itemSaleState = getProductSaleState(item, serverTime);
+                      const itemSaleState = getProductSaleState(item, clientLocalTime);
                       const isItemUpcoming = itemSaleState === 'UPCOMING';
                       const itemCountdown = item.openSaleTimestamp
-                        ? calculateRemainingTime(item.openSaleTimestamp, serverTime)
+                        ? calculateRemainingTime(item.openSaleTimestamp, clientLocalTime)
                         : null;
                       const itemVnTime = item.openSaleTimestamp
                         ? formatVietnamTime(item.openSaleTimestamp)

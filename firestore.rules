@@ -60,7 +60,13 @@ service cloud.firestore {
       // Authenticated buyers can place orders with initial PENDING status
       allow create: if isAuthenticated() && 
         request.auth.uid == request.resource.data.customerId &&
-        request.resource.data.status == 'PENDING';
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.items.size() > 0 &&
+        request.resource.data.total > 0 &&
+        request.resource.data.customerName is string &&
+        request.resource.data.customerPhone is string &&
+        request.resource.data.pickupMethod is string &&
+        request.resource.data.pickupLocation is string;
       
       // Only Seller can update order status (e.g. PREPARING, COMPLETED, CANCELLED) or delete orders
       allow update, delete: if isSeller();
