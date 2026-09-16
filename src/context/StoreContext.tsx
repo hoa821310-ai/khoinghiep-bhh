@@ -1,9 +1,9 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, Product, Order, OrderItem, PickupMethod, OrderStatus, RealtimeNotification, RealtimeConnectionStatus } from '../types';
 import { getNextWorkingDay } from '../utils/dateUtils';
 import { db, auth } from '../firebase';
-import { collection, doc, onSnapshot, query, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, getDoc, getDocs, writeBatch, orderBy, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, setDoc, updateDoc, deleteDoc, runTransaction, getDoc, orderBy, where } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 
 interface StoreContextType {
@@ -33,7 +33,6 @@ interface StoreContextType {
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   getMarketplaceProducts: () => Product[];
   getUserOrders: (userId?: string) => Order[];
-  refreshData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -51,7 +50,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeConnectionStatus>('connecting');
   const [realtimeNotification, setRealtimeNotification] = useState<RealtimeNotification | null>(null);
 
-  // Sync server time locally
+  // Update client-local clock for sale-time display/checks
   useEffect(() => {
     const timer = setInterval(() => {
       setClientLocalTime(Date.now());
@@ -351,17 +350,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!targetId) return [];
     return orders.filter(o => o.customerId === targetId);
   };
-  
-  const refreshData = async () => {};
 
   return (
     <StoreContext.Provider value={{
-      products, orders, currentUser, cart, sellerContactPhone, serverTime: clientLocalTime, isTimeSynced,
+      products, orders, currentUser, cart, sellerContactPhone, clientLocalTime, isTimeSynced,
       realtimeStatus, realtimeNotification, dismissRealtimeNotification,
       loginBuyer, loginSeller, registerBuyer, logout,
       updateUserProfile, updateSellerPhone, addProduct, updateProduct, deleteProduct,
       addToCart, removeFromCart, clearCart, createOrder, updateOrderStatus,
-      getMarketplaceProducts, getUserOrders, refreshData
+      getMarketplaceProducts, getUserOrders
     }}>
       {children}
     </StoreContext.Provider>
