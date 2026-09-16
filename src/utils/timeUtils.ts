@@ -90,9 +90,10 @@ export function calculateRemainingTime(targetTimestamp: number, currentServerTim
   detailedText: string;
   humanRemainingShort: string; // e.g. "Còn 51 phút", "Còn 1 ngày 4 giờ"
 } {
-  const diff = targetTimestamp - currentServerTime;
+  const target = Number(targetTimestamp);
+  const current = Number(currentServerTime) || Date.now();
 
-  if (diff <= 0) {
+  if (!target || isNaN(target) || target <= current) {
     return {
       isUpcoming: false,
       totalMs: 0,
@@ -107,6 +108,8 @@ export function calculateRemainingTime(targetTimestamp: number, currentServerTim
       humanRemainingShort: 'Đã mở bán'
     };
   }
+
+  const diff = target - current;
 
   const totalSeconds = Math.floor(diff / 1000);
   const days = Math.floor(totalSeconds / 86400);
@@ -162,9 +165,12 @@ export function getProductSaleState(
   product: Product,
   currentServerTime: number
 ): ProductSaleState {
+  if (!product) return 'SOLD_OUT';
   if (product.status === 'SOLD_OUT') return 'SOLD_OUT';
   if (product.status === 'HIDDEN') return 'HIDDEN';
-  if (product.openSaleTimestamp && product.openSaleTimestamp > currentServerTime) {
+  const openTs = Number(product.openSaleTimestamp);
+  const now = Number(currentServerTime) || Date.now();
+  if (openTs && !isNaN(openTs) && openTs > now) {
     return 'UPCOMING';
   }
   return 'AVAILABLE';

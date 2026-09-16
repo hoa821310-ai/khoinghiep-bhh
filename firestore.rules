@@ -8,6 +8,7 @@ service cloud.firestore {
     
     function isSeller() {
       return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SELLER';
     }
 
@@ -20,20 +21,31 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (request.auth.uid == userId || isSeller());
       allow list: if isSeller();
       
-      // User self-registration: strictly locked to BUYER role
+      // User self-registration: strictly locked to BUYER role and valid schema
       allow create: if isAuthenticated() && 
         request.auth.uid == userId && 
+        request.resource.data.id == userId &&
         request.resource.data.role == 'BUYER' &&
-        request.resource.data.id == userId;
+        request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100 &&
+        request.resource.data.email is string && request.resource.data.email.size() > 0 && request.resource.data.email.size() <= 100 &&
+        request.resource.data.className is string && request.resource.data.className.size() <= 50 &&
+        request.resource.data.phoneNumber is string && request.resource.data.phoneNumber.size() <= 20 &&
+        request.resource.data.keys().hasAll(['id', 'name', 'email', 'className', 'phoneNumber', 'role', 'createdAt']) &&
+        request.resource.data.keys().size() <= 8;
       
       // Profile update: cannot alter role, id, or email. Only allowed profile fields
       allow update: if isAuthenticated() && 
         request.auth.uid == userId &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.id == resource.data.id &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'className', 'phoneNumber']);
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'className', 'phoneNumber']) &&
+        request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100 &&
+        request.resource.data.className is string && request.resource.data.className.size() <= 50 &&
+        request.resource.data.phoneNumber is string && request.resource.data.phoneNumber.size() <= 20;
         
-      allow delete: if isSeller();
+      // Strictly deny delete for all user profiles
+      allow delete: if false;
     }
     
     match /products/{productId} {
@@ -41,14 +53,26 @@ service cloud.firestore {
       allow read: if true;
       
       // Only Seller can create or delete products
-      allow create, delete: if isSeller();
+      allow create: if isSeller() &&
+        request.resource.data.id == productId &&
+        request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
+        request.resource.data.price is number && request.resource.data.price >= 0 &&
+        request.resource.data.status in ['AVAILABLE', 'SOLD_OUT', 'HIDDEN'];
+        
+      allow delete: if isSeller();
       
-      // Seller can update any field; Buyer can ONLY transition status from AVAILABLE to SOLD_OUT during purchase
+      // Seller can update any field; Buyer can ONLY transition status from AVAILABLE to SOLD_OUT during purchase after opening time
       allow update: if isSeller() || (
         isAuthenticated() &&
         resource.data.status == 'AVAILABLE' &&
         request.resource.data.status == 'SOLD_OUT' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldOutAt', 'updatedAt'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldOutAt']) &&
+        request.resource.data.soldOutAt is number &&
+        (
+          !('openSaleTimestamp' in resource.data) ||
+          resource.data.openSaleTimestamp == null ||
+          request.time.toMillis() >= resource.data.openSaleTimestamp
+        )
       );
     }
     
@@ -57,19 +81,53 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (request.auth.uid == resource.data.customerId || isSeller());
       allow list: if isAuthenticated() && (isSeller() || resource.data.customerId == request.auth.uid);
       
-      // Authenticated buyers can place orders with initial PENDING status
+      // Authenticated buyers can place orders with initial PENDING status and validated data
       allow create: if isAuthenticated() && 
+        request.resource.data.id == orderId &&
         request.auth.uid == request.resource.data.customerId &&
         request.resource.data.status == 'PENDING' &&
+        request.resource.data.items is list &&
         request.resource.data.items.size() > 0 &&
+        request.resource.data.items.size() <= 20 &&
+        request.resource.data.total is number &&
         request.resource.data.total > 0 &&
-        request.resource.data.customerName is string &&
-        request.resource.data.customerPhone is string &&
-        request.resource.data.pickupMethod is string &&
-        request.resource.data.pickupLocation is string;
+        request.resource.data.total <= 100000000 &&
+        request.resource.data.customerName is string && request.resource.data.customerName.size() > 0 && request.resource.data.customerName.size() <= 100 &&
+        request.resource.data.className is string && request.resource.data.className.size() > 0 && request.resource.data.className.size() <= 50 &&
+        request.resource.data.customerPhone is string && request.resource.data.customerPhone.size() > 0 && request.resource.data.customerPhone.size() <= 20 &&
+        request.resource.data.pickupMethod in ['CLASS', 'OTHER'] &&
+        request.resource.data.pickupLocation is string && request.resource.data.pickupLocation.size() > 0 && request.resource.data.pickupLocation.size() <= 200 &&
+        (!('orderNotes' in request.resource.data) || (request.resource.data.orderNotes is string && request.resource.data.orderNotes.size() <= 500)) &&
+        request.resource.data.expectedDeliveryDate is string && request.resource.data.expectedDeliveryDate.size() > 0 && request.resource.data.expectedDeliveryDate.size() <= 100 &&
+        request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 50 &&
+        request.resource.data.keys().hasAll(['id', 'customerId', 'customerName', 'className', 'customerPhone', 'pickupMethod', 'pickupLocation', 'createdAt', 'expectedDeliveryDate', 'status', 'total', 'items']) &&
+        request.resource.data.keys().size() >= 12 &&
+        request.resource.data.keys().size() <= 13 &&
+        request.resource.data.items[0] is map &&
+        request.resource.data.items[0].productId is string &&
+        request.resource.data.items[0].productName is string &&
+        request.resource.data.items[0].price is number &&
+        request.resource.data.items[0].price > 0 &&
+        exists(/databases/$(database)/documents/products/$(request.resource.data.items[0].productId)) &&
+        (
+          !('openSaleTimestamp' in get(/databases/$(database)/documents/products/$(request.resource.data.items[0].productId)).data) ||
+          get(/databases/$(database)/documents/products/$(request.resource.data.items[0].productId)).data.openSaleTimestamp == null ||
+          request.time.toMillis() >= get(/databases/$(database)/documents/products/$(request.resource.data.items[0].productId)).data.openSaleTimestamp
+        );
       
-      // Only Seller can update order status (e.g. PREPARING, COMPLETED, CANCELLED) or delete orders
-      allow update, delete: if isSeller();
+      // Only Seller can update order status; cannot modify customer, items, or total; deletion is prohibited
+      allow update: if isSeller() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+        request.resource.data.status in ['PENDING', 'PREPARING', 'COMPLETED', 'CANCELLED'];
+        
+      allow delete: if false;
+    }
+
+    match /settings/{settingId} {
+      // Public read for settings like hotline
+      allow read: if true;
+      // Only Seller can update settings
+      allow write: if isSeller() && settingId == 'general';
     }
   }
 }

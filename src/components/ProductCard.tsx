@@ -20,9 +20,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart,
   onEdit
 }) => {
-  const { serverTime: clientLocalTime, currentUser, deleteProduct } = useStore();
+  const { serverTime, clientLocalTime, currentUser, deleteProduct } = useStore();
+  const currentTime = serverTime || clientLocalTime || Date.now();
   const isSeller = currentUser?.role === 'SELLER';
-  const saleState = getProductSaleState(product, clientLocalTime);
+  const saleState = getProductSaleState(product, currentTime);
   const isSoldOut = saleState === 'SOLD_OUT';
   const isUpcoming = saleState === 'UPCOMING';
 
@@ -32,11 +33,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const displayPeriod = product.deliveryPeriod || (product.deliveryPeriods && product.deliveryPeriods[0]) || 'Ra chơi chiều';
 
   const countdown = product.openSaleTimestamp
-    ? calculateRemainingTime(product.openSaleTimestamp, clientLocalTime)
+    ? calculateRemainingTime(Number(product.openSaleTimestamp), currentTime)
     : null;
 
   const openingVnTime = product.openSaleTimestamp
-    ? formatVietnamTime(product.openSaleTimestamp)
+    ? formatVietnamTime(Number(product.openSaleTimestamp))
     : null;
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

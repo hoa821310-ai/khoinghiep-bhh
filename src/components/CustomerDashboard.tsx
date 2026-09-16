@@ -65,19 +65,19 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onExploreP
       <div className="bg-[#FFFDF7] rounded-3xl border border-[#DED8C5] p-6 sm:p-8 shadow-xs mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-[#6C9A4A] text-white flex items-center justify-center font-heading font-extrabold text-2xl shadow-xs">
-            {currentUser.name.charAt(0).toUpperCase()}
+            {(currentUser.name || 'H').charAt(0).toUpperCase()}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-heading font-extrabold text-xl sm:text-2xl text-[#283124]">
-                {currentUser.name}
+                {currentUser.name || 'Học sinh'}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#C7DCAE]/60 text-[#405B32] border border-[#6C9A4A]/30">
                 {currentUser.className || 'Học sinh'}
               </span>
             </div>
             <p className="text-xs text-[#707766] mt-0.5 flex items-center gap-2">
-              <span>SĐT: <strong className="text-[#283124]">{formatPhoneDisplay(currentUser.phoneNumber)}</strong></span>
+              <span>SĐT: <strong className="text-[#283124]">{formatPhoneDisplay(currentUser.phoneNumber || '')}</strong></span>
               <span>•</span>
               <span>{currentUser.email}</span>
             </p>
@@ -163,15 +163,15 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onExploreP
 
                   {/* Order Items */}
                   <div className="space-y-2.5">
-                    {order.items.map((item, idx) => (
+                    {(order.items || []).map((item, idx) => (
                       <div
                         key={idx}
                         className="flex items-center justify-between p-3 rounded-2xl bg-[#F8F1DF]/60 border border-[#DED8C5]/60"
                       >
                         <div className="flex items-center gap-3">
                           <img
-                            src={item.imageUrl}
-                            alt={item.productName}
+                            src={item.imageUrl || ''}
+                            alt={item.productName || 'Sản phẩm'}
                             referrerPolicy="no-referrer"
                             className="w-12 h-12 rounded-xl object-cover border border-[#DED8C5]"
                           />
@@ -186,13 +186,13 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onExploreP
                             </div>
                             <p className="text-[11px] text-[#707766] flex items-center gap-1 mt-0.5">
                               <Clock className="w-3 h-3 text-[#F28C38]" />
-                              <span>Khung giờ: {item.deliveryPeriod}</span>
+                              <span>Khung giờ: {item.deliveryPeriod || 'Ra chơi'}</span>
                             </p>
                           </div>
                         </div>
 
                         <span className="font-heading font-extrabold text-sm text-[#405B32]">
-                          {formatVND(item.price)}
+                          {formatVND(Number(item.price) || 0)}
                         </span>
                       </div>
                     ))}
@@ -203,18 +203,18 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onExploreP
                     <div className="space-y-1">
                       <p className="text-[#707766] flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-[#6C9A4A]" />
-                        <span>Nơi nhận: <strong className="text-[#283124]">{order.pickupLocation}</strong></span>
+                        <span>Nơi nhận: <strong className="text-[#283124]">{order.pickupLocation || 'Chưa cập nhật'}</strong></span>
                       </p>
                       <p className="text-[#707766] flex items-center gap-1.5">
                         <Phone className="w-3.5 h-3.5 text-[#6C9A4A]" />
-                        <span>SĐT nhận đơn: <strong className="text-[#283124]">{formatPhoneDisplay(order.customerPhone)}</strong></span>
+                        <span>SĐT nhận đơn: <strong className="text-[#283124]">{formatPhoneDisplay(order.customerPhone || '')}</strong></span>
                       </p>
                     </div>
 
                     <div className="space-y-1">
                       <p className="text-[#707766] flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-[#6C9A4A]" />
-                        <span>Ngày nhận dự kiến: <strong className="text-[#405B32]">{order.expectedDeliveryDate}</strong></span>
+                        <span>Ngày nhận dự kiến: <strong className="text-[#405B32]">{order.expectedDeliveryDate || 'Ngày làm việc tiếp theo'}</strong></span>
                       </p>
                       {order.orderNotes && (
                         <p className="text-[#707766] italic">
@@ -228,7 +228,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onExploreP
                   <div className="flex items-center justify-between pt-2 border-t border-[#DED8C5]/60 text-sm">
                     <span className="text-xs font-bold text-[#707766]">Tổng giá trị đơn hàng:</span>
                     <span className="font-heading font-extrabold text-base sm:text-lg text-[#405B32]">
-                      {formatVND(order.total)}
+                      {formatVND(Number(order.total) || 0)}
                     </span>
                   </div>
 

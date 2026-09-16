@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Product, Order, OrderStatus } from '../types';
 import { formatVND, formatPhoneDisplay } from '../utils/dateUtils';
@@ -43,9 +43,9 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
     currentUser,
     deleteProduct,
     updateOrderStatus,
-    sellerContactPhone,
-    updateSellerPhone,
-    serverTime: clientLocalTime,
+    hotline,
+    updateHotline,
+    clientLocalTime,
     realtimeStatus
   } = useStore();
 
@@ -54,9 +54,16 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('ALL');
 
   // Seller phone edit
-  const [phoneInput, setPhoneInput] = useState(sellerContactPhone);
+  const [phoneInput, setPhoneInput] = useState(hotline);
   const [phoneSuccess, setPhoneSuccess] = useState('');
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  // Sync phoneInput whenever hotline changes
+  useEffect(() => {
+    if (hotline) {
+      setPhoneInput(hotline);
+    }
+  }, [hotline]);
 
   // Protect route
   if (!currentUser || currentUser.role !== 'SELLER') {
@@ -76,20 +83,21 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
   }
 
   // KPIs
-  const availableProducts = products.filter(p => p.status === 'AVAILABLE');
-  const soldProducts = products.filter(p => p.status === 'SOLD_OUT' || p.status === 'HIDDEN');
-  const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'PREPARING');
+  const availableProducts = products.filter(p => p && p.status === 'AVAILABLE');
+  const soldProducts = products.filter(p => p && (p.status === 'SOLD_OUT' || p.status === 'HIDDEN'));
+  const pendingOrders = orders.filter(o => o && (o.status === 'PENDING' || o.status === 'PREPARING'));
   const totalRevenue = orders
-    .filter(o => o.status !== 'CANCELLED')
-    .reduce((sum, o) => sum + o.total, 0);
+    .filter(o => o && o.status !== 'CANCELLED')
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
 
   // Orders filtered by Buyer Name and Status
   const filteredOrders = orders.filter(order => {
+    if (!order) return false;
     if (buyerSearchQuery.trim()) {
       const q = buyerSearchQuery.toLowerCase().trim();
-      const matchName = order.customerName.toLowerCase().includes(q);
-      const matchClass = order.className.toLowerCase().includes(q);
-      const matchPhone = order.customerPhone.includes(q);
+      const matchName = (order.customerName || '').toLowerCase().includes(q);
+      const matchClass = (order.className || '').toLowerCase().includes(q);
+      const matchPhone = (order.customerPhone || '').includes(q);
       if (!matchName && !matchClass && !matchPhone) return false;
     }
     if (orderStatusFilter !== 'ALL') {
@@ -100,7 +108,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
 
   const handleUpdatePhone = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSellerPhone(phoneInput);
+    updateHotline(phoneInput);
     setPhoneSuccess('Đã cập nhật số điện thoại liên hệ của CLB!');
     setTimeout(() => setPhoneSuccess(''), 3000);
   };
@@ -130,7 +138,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
               <span>{realtimeStatus === 'connected' ? 'Realtime Live (Tự động nhận đơn mới)' : 'Đang kết nối lại...'}</span>
             </span>
             <span className="text-xs text-[#707766]">
-              Hotline CLB: <strong>{formatPhoneDisplay(sellerContactPhone)}</strong>
+              Hotline CLB: <strong>{formatPhoneDisplay(hotline)}</strong>
             </span>
           </div>
           <h1 className="font-heading font-extrabold text-2xl sm:text-3xl text-[#283124]">

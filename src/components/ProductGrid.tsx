@@ -24,16 +24,16 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
   onOpenAddProductModal,
   onEditProduct
 }) => {
-  const { currentUser, serverTime: clientLocalTime } = useStore();
+  const { currentUser, clientLocalTime } = useStore();
   const [filter, setFilter] = useState<FilterStatus>('ALL');
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       // Search query filter
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        const matchesName = product.name.toLowerCase().includes(query);
-        const matchesDesc = product.description.toLowerCase().includes(query);
+        const query = (searchQuery || '').toLowerCase().trim();
+        const matchesName = (product.name || '').toLowerCase().includes(query);
+        const matchesDesc = (product.description || '').toLowerCase().includes(query);
         if (!matchesName && !matchesDesc) return false;
       }
 

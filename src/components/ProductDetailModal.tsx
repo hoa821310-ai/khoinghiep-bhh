@@ -22,7 +22,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onBuyNow,
   onEditProduct
 }) => {
-  const { sellerContactPhone, serverTime: clientLocalTime, currentUser, deleteProduct } = useStore();
+  const { sellerContactPhone, serverTime, clientLocalTime, currentUser, deleteProduct } = useStore();
+  const currentTime = serverTime || clientLocalTime || Date.now();
   const isSeller = currentUser?.role === 'SELLER';
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -30,7 +31,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!product) return null;
 
-  const saleState = getProductSaleState(product, clientLocalTime);
+  const saleState = getProductSaleState(product, currentTime);
   const isSoldOut = saleState === 'SOLD_OUT';
   const isUpcoming = saleState === 'UPCOMING';
   const isAvailable = saleState === 'AVAILABLE';
@@ -38,11 +39,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const { fullDescription: nextDeliveryDate } = getNextWorkingDay(new Date());
 
   const countdown = product.openSaleTimestamp
-    ? calculateRemainingTime(product.openSaleTimestamp, clientLocalTime)
+    ? calculateRemainingTime(Number(product.openSaleTimestamp), currentTime)
     : null;
 
   const openingVnTime = product.openSaleTimestamp
-    ? formatVietnamTime(product.openSaleTimestamp)
+    ? formatVietnamTime(Number(product.openSaleTimestamp))
     : null;
 
   const handleDelete = () => {

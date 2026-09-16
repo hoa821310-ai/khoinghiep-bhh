@@ -86,6 +86,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const prevOpenRef = useRef<boolean>(false);
   const prevEditIdRef = useRef<string | null | undefined>(undefined);
 
+  // Memory leak prevention for object URLs
+  useEffect(() => {
+    return () => {
+      formImages.forEach(item => {
+        if (item.previewUrl.startsWith('blob:')) {
+          try {
+            URL.revokeObjectURL(item.previewUrl);
+          } catch (e) {}
+        }
+      });
+    };
+  }, [formImages]);
+
   useEffect(() => {
     if (!isOpen) {
       prevOpenRef.current = false;
@@ -274,7 +287,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setSuccessMessage('');
 
     const fileList: File[] = Array.from(files);
-    console.log("=== FILE UPLOAD RECEIVED ===", fileList.map((f: File) => `${f.name} (${Math.round(f.size / 1024)} KB)`));
+
+    // Validate file types
+    const nonImageFiles = fileList.filter(f => !f.type.startsWith('image/'));
+    if (nonImageFiles.length > 0) {
+      setErrorMessage('Chỉ hỗ trợ tệp định dạng hình ảnh (PNG, JPG, JPEG, WEBP).');
+      e.target.value = '';
+      return;
+    }
+
+    // Validate file size limit
+    const tooLargeFiles = fileList.filter(f => f.size > 12 * 1024 * 1024);
+    if (tooLargeFiles.length > 0) {
+      setErrorMessage('Dung lượng tệp quá lớn (> 12MB). Vui lòng chọn ảnh nhẹ hơn.');
+      e.target.value = '';
+      return;
+    }
 
     // 1. Instantly create Object URLs for immediate 0ms UI preview
     const newItems: { id: string; file: File; previewUrl: string }[] = fileList.map((file: File) => ({
@@ -300,14 +328,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     // 3. Process each image in background for permanent Base64 storage
     newItems.forEach(async (item) => {
       try {
-        console.log(`[Image Processing] Bắt đầu nén: ${item.file.name}...`);
         const base64 = await processFileToBase64(item.file);
-        console.log(`[Image Processing] Nén thành công: ${item.file.name} -> Base64 (${Math.round(base64.length / 1024)} KB)`);
+        
+        // Revoke the temporary blob URL now that Base64 is ready
+        if (item.previewUrl.startsWith('blob:')) {
+          try {
+            URL.revokeObjectURL(item.previewUrl);
+          } catch (e) {}
+        }
 
         setFormImages(prev => prev.map(it => {
           if (it.id === item.id) {
             return {
               ...it,
+              previewUrl: base64, // replace blob with permanent base64 preview
               base64,
               status: 'ready' as const
             };
@@ -316,6 +350,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         }));
       } catch (err: any) {
         console.error(`[Image Processing Error] ${item.file.name}:`, err);
+        // Clean up blob URL on error too
+        if (item.previewUrl.startsWith('blob:')) {
+          try {
+            URL.revokeObjectURL(item.previewUrl);
+          } catch (e) {}
+        }
         setFormImages(prev => prev.map(it => {
           if (it.id === item.id) {
             return {

@@ -85,3 +85,7 @@ export interface Order {
   items: OrderItem[];
 }
 
+export interface Settings {
+  hotline: string;
+}
+
