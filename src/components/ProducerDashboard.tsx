@@ -751,7 +751,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
                 type="tel"
                 value={phoneInput}
                 onChange={e => setPhoneInput(e.target.value)}
-                placeholder="0974 900 849"
+                placeholder="0974990849"
                 required
                 className="w-full px-3.5 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
               />

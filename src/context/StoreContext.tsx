@@ -46,8 +46,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [orders, setOrders] = useState<Order[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [cart, setCart] = useState<Product[]>([]);
-  const [sellerContactPhone, setSellerContactPhone] = useState<string>('0974 900 849');
-  const [hotline, setHotline] = useState<string>('0974 900 849');
+  const [sellerContactPhone, setSellerContactPhone] = useState<string>('0974990849');
+  const [hotline, setHotline] = useState<string>('0974990849');
   
   const [clientLocalTime, setClientLocalTime] = useState<number>(Date.now());
   const [isTimeSynced, setIsTimeSynced] = useState<boolean>(true);
@@ -64,8 +64,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setHotline(hl);
         setSellerContactPhone(hl);
       } else {
-        setHotline('0974 900 849');
-        setSellerContactPhone('0974 900 849');
+        setHotline('0974990849');
+        setSellerContactPhone('0974990849');
       }
     }, (err) => {
       console.warn("Settings listen error:", err);

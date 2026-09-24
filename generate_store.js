@@ -50,7 +50,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [orders, setOrders] = useState<Order[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [cart, setCart] = useState<Product[]>([]);
-  const [sellerContactPhone, setSellerContactPhone] = useState<string>('0974 900 849');
+  const [sellerContactPhone, setSellerContactPhone] = useState<string>('0974990849');
   
   const [serverTime, setServerTime] = useState<number>(Date.now());
   const [isTimeSynced, setIsTimeSynced] = useState<boolean>(true);
@@ -85,7 +85,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               name: 'CLB Khởi Nghiệp',
               email: SELLER_FIXED_EMAIL,
               className: 'CLB Khởi Nghiệp',
-              phoneNumber: '0974900849',
+              phoneNumber: '0974990849',
               role: 'SELLER',
               createdAt: new Date().toISOString()
             };
