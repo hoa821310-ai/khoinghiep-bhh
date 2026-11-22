@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
 import { PickupMethod, Order } from '../types';
 import { formatVND, getNextWorkingDay, isValidPhoneNumber, formatPhoneDisplay } from '../utils/dateUtils';
@@ -17,7 +17,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   onOrderSuccess
 }) => {
-  const { currentUser, cart, products, createOrder, serverTime, clientLocalTime } = useStore();
+  const { currentUser, cart, createOrder, serverTime, clientLocalTime } = useStore();
   const currentTime = serverTime || clientLocalTime || Date.now();
   const { fullDescription: nextDeliveryDate } = getNextWorkingDay(new Date());
 
@@ -36,7 +36,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isSubmittingRef = useRef(false);
 
   // Check upcoming items
   const upcomingInCart = cart.filter(item => getProductSaleState(item, currentTime) === 'UPCOMING');
@@ -80,16 +79,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setErrorMessage('Vui lòng nhập họ và tên người nhận.');
       return;
     }
-    if (buyerName.trim().length > 100) {
-      setErrorMessage('Họ và tên không được vượt quá 100 ký tự.');
-      return;
-    }
     if (!buyerClass.trim()) {
       setErrorMessage('Vui lòng nhập lớp của bạn.');
-      return;
-    }
-    if (buyerClass.trim().length > 50) {
-      setErrorMessage('Lớp không được vượt quá 50 ký tự.');
       return;
     }
     if (!buyerPhone.trim()) {
@@ -98,10 +89,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
     if (!isValidPhoneNumber(buyerPhone)) {
       setErrorMessage('Vui lòng nhập số điện thoại hợp lệ (10 chữ số, ví dụ: 0901234567).');
-      return;
-    }
-    if (buyerPhone.length > 20) {
-      setErrorMessage('Số điện thoại không được vượt quá 20 ký tự.');
       return;
     }
 
@@ -113,26 +100,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setErrorMessage('Vui lòng nhập rõ địa điểm nhận hàng cụ thể (ví dụ: Căn tin, Phòng Thư viện, Cổng trường).');
       return;
     }
-    if (getFinalPickupLocation().length > 200) {
-      setErrorMessage('Địa điểm nhận hàng không được vượt quá 200 ký tự.');
-      return;
-    }
-    if (orderNotes.trim().length > 500) {
-      setErrorMessage('Ghi chú đơn hàng không được vượt quá 500 ký tự.');
-      return;
-    }
 
     setStep('REVIEW');
   };
 
   const handleConfirmOrder = async () => {
-    if (isSubmittingRef.current) return;
     if (hasUpcoming && earliestCountdown) {
       setErrorMessage(`Sản phẩm "${earliestUpcoming?.name}" chưa đến lịch mở bán (${earliestVnTime ? earliestVnTime.saleScheduleDisplay : earliestUpcoming?.openingAt}).`);
       return;
     }
 
-    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setErrorMessage('');
 
@@ -148,6 +125,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         overridePhone: buyerPhone
       });
 
+      setIsSubmitting(false);
+
       if (res.success && res.order) {
         setConfirmedOrder(res.order);
         setStep('SUCCESS');
@@ -157,11 +136,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setStep('FORM');
       }
     } catch (err: any) {
-      setErrorMessage('Không thể tạo đơn hàng lúc này. Vui lòng thử lại sau.');
-      setStep('FORM');
-    } finally {
-      isSubmittingRef.current = false;
       setIsSubmitting(false);
+      setErrorMessage(err?.message || 'Có lỗi xảy ra khi tạo đơn hàng.');
+      setStep('FORM');
     }
   };
 
@@ -219,7 +196,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       type="text"
                       value={buyerName}
                       onChange={e => setBuyerName(e.target.value)}
-                      maxLength={100}
                       required
                       placeholder="Nguyễn Văn A"
                       className="w-full px-3.5 py-2.5 bg-[#FFFDF7] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
@@ -234,7 +210,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       type="text"
                       value={buyerClass}
                       onChange={e => setBuyerClass(e.target.value)}
-                      maxLength={50}
                       required
                       placeholder="10A1"
                       className="w-full px-3.5 py-2.5 bg-[#FFFDF7] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
@@ -250,7 +225,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     type="tel"
                     value={buyerPhone}
                     onChange={e => setBuyerPhone(e.target.value.replace(/[^\d\s]/g, ''))}
-                    maxLength={20}
                     required
                     placeholder="09xxxxxxxx"
                     className="w-full px-3.5 py-2.5 bg-[#FFFDF7] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
@@ -322,7 +296,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       placeholder="Ví dụ: 10A1 (Dãy nhà B, Tầng 2)"
                       value={pickupClass}
                       onChange={e => setPickupClass(e.target.value)}
-                      maxLength={50}
                       required
                       className="w-full px-3.5 py-2.5 bg-[#FFFDF7] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
                     />
@@ -337,7 +310,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       placeholder="Ví dụ: Bàn 3 Căn tin, Phòng Thư viện, Cổng số 1, Phòng CLB..."
                       value={pickupOtherLocation}
                       onChange={e => setPickupOtherLocation(e.target.value)}
-                      maxLength={200}
                       required
                       className="w-full px-3.5 py-2.5 bg-[#FFFDF7] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
                     />
@@ -355,7 +327,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   placeholder="Ví dụ: Giao vào giờ ra chơi chiều; Gọi cho tôi trước khi đến..."
                   value={orderNotes}
                   onChange={e => setOrderNotes(e.target.value)}
-                  maxLength={500}
                   className="w-full px-3.5 py-2 bg-[#F8F1DF] border border-[#DED8C5] rounded-2xl text-xs sm:text-sm text-[#283124] placeholder-[#707766]/70 focus:outline-none focus:border-[#6C9A4A]"
                 ></textarea>
               </div>
@@ -441,7 +412,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={item.imageUrl || ''}
+                        src={item.imageUrl || (item.images && item.images[0]) || ''}
                         alt=""
                         className="w-12 h-12 rounded-xl object-cover border border-[#DED8C5]"
                       />
@@ -583,18 +554,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {/* Items in receipt */}
               <div className="space-y-1.5 pt-1">
                 <span className="text-[#707766] block font-semibold">Sản phẩm đã đặt:</span>
-                {confirmedOrder.items.map((item, idx) => {
-                  const product = products.find(current => current.id === item.productId);
-                  return (
-                    <div key={idx} className="flex justify-between items-center py-1">
-                      <span>
-                        • {item.productName} × {item.quantity}
-                        {product?.deliveryPeriod ? ` (${product.deliveryPeriod})` : ''}
-                      </span>
-                      <strong className="text-[#405B32]">{formatVND(item.price * item.quantity)}</strong>
-                    </div>
-                  );
-                })}
+                {confirmedOrder.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center py-1">
+                    <span>• {item.productName} ({item.deliveryPeriod})</span>
+                    <strong className="text-[#405B32]">{formatVND(item.price)}</strong>
+                  </div>
+                ))}
               </div>
 
               <div className="flex justify-between items-center pt-2 border-t border-[#DED8C5] text-sm">

@@ -151,7 +151,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         >
                           <div className="w-16 h-16 rounded-xl overflow-hidden bg-[#FFFDF7] border border-[#DED8C5] shrink-0">
                             <img
-                              src={item.imageUrl || ''}
+                              src={item.imageUrl || (item.images && item.images[0]) || ''}
                               alt={item.name}
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover"
