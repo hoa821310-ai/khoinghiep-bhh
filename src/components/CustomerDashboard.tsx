@@ -10,7 +10,7 @@ interface CustomerDashboardProps {
 }
 
 export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onExploreProducts }) => {
-  const { currentUser, getUserOrders, updateUserProfile } = useStore();
+  const { currentUser, getUserOrders, updateUserProfile, products } = useStore();
   const [activeTab, setActiveTab] = useState<'orders' | 'profile'>('orders');
 
   // Edit Profile States
@@ -163,39 +163,49 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({ onExploreP
 
                   {/* Order Items */}
                   <div className="space-y-2.5">
-                    {(order.items || []).map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-3 rounded-2xl bg-[#F8F1DF]/60 border border-[#DED8C5]/60"
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={item.imageUrl || ''}
-                            alt={item.productName || 'Sản phẩm'}
-                            referrerPolicy="no-referrer"
-                            className="w-12 h-12 rounded-xl object-cover border border-[#DED8C5]"
-                          />
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-[#C7DCAE]/60 text-[#405B32]">
-                                1 of 1
-                              </span>
-                              <h4 className="font-heading font-bold text-xs sm:text-sm text-[#283124]">
-                                {item.productName}
-                              </h4>
+                    {(order.items || []).map((item, idx) => {
+                      const product = products.find(p => p.id === item.productId);
+                      const imageUrl = product?.imageUrl;
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-3 rounded-2xl bg-[#F8F1DF]/60 border border-[#DED8C5]/60"
+                        >
+                          <div className="flex items-center gap-3">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.productName || 'Sản phẩm'}
+                                referrerPolicy="no-referrer"
+                                className="w-12 h-12 rounded-xl object-cover border border-[#DED8C5]"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-xl border border-[#DED8C5] flex items-center justify-center text-[#707766]">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-[#C7DCAE]/60 text-[#405B32]">
+                                  1 of 1
+                                </span>
+                                <h4 className="font-heading font-bold text-xs sm:text-sm text-[#283124]">
+                                  {item.productName}
+                                </h4>
+                              </div>
+                              <p className="text-[11px] text-[#707766] flex items-center gap-1 mt-0.5">
+                                <Clock className="w-3 h-3 text-[#F28C38]" />
+                                <span>Khung giờ: {product?.deliveryPeriod || product?.deliveryPeriods?.[0] || 'Không còn sản phẩm'}</span>
+                              </p>
                             </div>
-                            <p className="text-[11px] text-[#707766] flex items-center gap-1 mt-0.5">
-                              <Clock className="w-3 h-3 text-[#F28C38]" />
-                              <span>Khung giờ: {item.deliveryPeriod || 'Ra chơi'}</span>
-                            </p>
                           </div>
-                        </div>
 
-                        <span className="font-heading font-extrabold text-sm text-[#405B32]">
-                          {formatVND(Number(item.price) || 0)}
-                        </span>
-                      </div>
-                    ))}
+                          <span className="font-heading font-extrabold text-sm text-[#405B32]">
+                            {formatVND(Number(item.price) || 0)}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Delivery Location & Notes Breakdown */}

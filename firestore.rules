@@ -56,13 +56,22 @@ service cloud.firestore {
       allow create: if isSeller() &&
         request.resource.data.id == productId &&
         request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200 &&
+        request.resource.data.description is string && request.resource.data.description.size() <= 2000 &&
+        request.resource.data.images is list && request.resource.data.images.size() > 0 && request.resource.data.images.size() <= 3 &&
+        request.resource.data.imageUrl is string && request.resource.data.imageUrl.size() <= 50000 &&
         request.resource.data.price is number && request.resource.data.price >= 0 &&
         request.resource.data.status in ['AVAILABLE', 'SOLD_OUT', 'HIDDEN'];
         
       allow delete: if isSeller();
       
-      // Seller can update any field; Buyer can ONLY transition status from AVAILABLE to SOLD_OUT during purchase after opening time
-      allow update: if isSeller() || (
+      // Sellers must keep the thumbnail and image list within their size limits.
+      allow update: if (
+        isSeller() &&
+        request.resource.data.images is list &&
+        request.resource.data.images.size() <= 3 &&
+        request.resource.data.imageUrl is string &&
+        request.resource.data.imageUrl.size() <= 50000
+      ) || (
         isAuthenticated() &&
         resource.data.status == 'AVAILABLE' &&
         request.resource.data.status == 'SOLD_OUT' &&
@@ -88,13 +97,13 @@ service cloud.firestore {
         request.resource.data.status == 'PENDING' &&
         request.resource.data.items is list &&
         request.resource.data.items.size() > 0 &&
-        request.resource.data.items.size() <= 20 &&
+        request.resource.data.items.size() <= 100 &&
         request.resource.data.total is number &&
         request.resource.data.total > 0 &&
         request.resource.data.total <= 100000000 &&
         request.resource.data.customerName is string && request.resource.data.customerName.size() > 0 && request.resource.data.customerName.size() <= 100 &&
         request.resource.data.className is string && request.resource.data.className.size() > 0 && request.resource.data.className.size() <= 50 &&
-        request.resource.data.customerPhone is string && request.resource.data.customerPhone.size() > 0 && request.resource.data.customerPhone.size() <= 20 &&
+        request.resource.data.customerPhone is string && request.resource.data.customerPhone.matches('^0[35789][0-9]{8}$') &&
         request.resource.data.pickupMethod in ['CLASS', 'OTHER'] &&
         request.resource.data.pickupLocation is string && request.resource.data.pickupLocation.size() > 0 && request.resource.data.pickupLocation.size() <= 200 &&
         (!('orderNotes' in request.resource.data) || (request.resource.data.orderNotes is string && request.resource.data.orderNotes.size() <= 500)) &&
@@ -106,8 +115,11 @@ service cloud.firestore {
         request.resource.data.items[0] is map &&
         request.resource.data.items[0].productId is string &&
         request.resource.data.items[0].productName is string &&
+        request.resource.data.items[0].productName.size() <= 200 &&
         request.resource.data.items[0].price is number &&
         request.resource.data.items[0].price > 0 &&
+        request.resource.data.items[0].quantity is number &&
+        request.resource.data.items[0].quantity > 0 &&
         exists(/databases/$(database)/documents/products/$(request.resource.data.items[0].productId)) &&
         (
           !('openSaleTimestamp' in get(/databases/$(database)/documents/products/$(request.resource.data.items[0].productId)).data) ||

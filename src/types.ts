@@ -39,8 +39,7 @@ export interface OrderItem {
   productId: string;
   productName: string;
   price: number;
-  imageUrl: string;
-  deliveryPeriod: string;
+  quantity: number;
 }
 
 export type PickupMethod = 'CLASS' | 'OTHER';
