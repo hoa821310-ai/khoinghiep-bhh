@@ -1,11 +1,16 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { User, Product, Order, OrderItem, PickupMethod, OrderStatus, RealtimeNotification, RealtimeConnectionStatus } from '../types';
-import { getNextWorkingDay } from '../utils/dateUtils';
+import { getNextWorkingDay, isValidPhoneNumber } from '../utils/dateUtils';
 import { db, auth } from '../firebase';
 import { collection, doc, onSnapshot, query, setDoc, updateDoc, deleteDoc, runTransaction, getDoc, orderBy, where } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { soundService } from '../utils/soundUtils';
+
+const MAX_FIRESTORE_DOCUMENT_BYTES = 700 * 1024;
+
+const getFirestoreDocumentSize = (data: unknown) =>
+  new Blob([JSON.stringify(data)]).size;
 
 interface StoreContextType {
   products: Product[];
@@ -310,12 +315,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       createdAt: new Date().toISOString(),
       createdBy: currentUser?.name || 'CLB Khởi Nghiệp'
     };
+    if (getFirestoreDocumentSize(newProduct) > MAX_FIRESTORE_DOCUMENT_BYTES) {
+      throw new Error('Thông tin sản phẩm vượt quá 700 KB. Vui lòng giảm ảnh hoặc rút ngắn mô tả.');
+    }
     await setDoc(newDocRef, newProduct);
     return newProduct;
   };
 
   const updateProduct = async (id: string, updates: Partial<Product>) => {
-    await updateDoc(doc(db, 'products', id), updates);
+    const safeUpdates = { ...updates };
+    const productRef = doc(db, 'products', id);
+    const existing = await getDoc(productRef);
+    const updatedProduct = { ...(existing.data() || {}), ...safeUpdates };
+    if (getFirestoreDocumentSize(updatedProduct) > MAX_FIRESTORE_DOCUMENT_BYTES) {
+      throw new Error('Thông tin sản phẩm vượt quá 700 KB. Vui lòng giảm ảnh hoặc rút ngắn mô tả.');
+    }
+    await updateDoc(productRef, safeUpdates);
   };
 
   const deleteProduct = async (id: string) => {
@@ -355,9 +370,43 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCart([]);
   };
 
-  const createOrder = async (data: any) => {
+  const createOrder = async (data: {
+    pickupMethod: PickupMethod;
+    pickupLocation: string;
+    orderNotes?: string;
+    overrideName?: string;
+    overrideClass?: string;
+    overridePhone?: string;
+  }) => {
     if (!currentUser) return { success: false, message: 'Vui lòng đăng nhập.' };
     if (cart.length === 0) return { success: false, message: 'Giỏ hàng trống.' };
+    if (cart.length > 100) {
+      return { success: false, message: 'Mỗi đơn tối đa 100 sản phẩm, vui lòng đặt thành nhiều đơn.' };
+    }
+
+    const buyerName = (data.overrideName || currentUser.name || '').trim();
+    const buyerClass = (data.overrideClass || currentUser.className || '').trim();
+    const buyerPhone = (data.overridePhone || currentUser.phoneNumber || '').replace(/\s+/g, '');
+    const pickupLoc = (data.pickupLocation || '').trim();
+    const orderNotes = (data.orderNotes || '').trim();
+    if (!buyerName || buyerName.length > 100) {
+      return { success: false, message: 'Họ và tên bắt buộc và không được vượt quá 100 ký tự.' };
+    }
+    if (!buyerClass || buyerClass.length > 50) {
+      return { success: false, message: 'Lớp bắt buộc và không được vượt quá 50 ký tự.' };
+    }
+    if (!isValidPhoneNumber(buyerPhone) || buyerPhone.length > 20) {
+      return { success: false, message: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số).' };
+    }
+    if (!pickupLoc || pickupLoc.length > 200) {
+      return { success: false, message: 'Địa điểm nhận hàng bắt buộc và không được vượt quá 200 ký tự.' };
+    }
+    if (!['CLASS', 'OTHER'].includes(data.pickupMethod || 'CLASS')) {
+      return { success: false, message: 'Phương thức nhận hàng không hợp lệ.' };
+    }
+    if (orderNotes.length > 500) {
+      return { success: false, message: 'Ghi chú đơn hàng không được vượt quá 500 ký tự.' };
+    }
 
     const unreleasedInCart = cart.filter(c => {
       const liveProduct = products.find(p => p.id === c.id) || c;
@@ -396,19 +445,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
         });
 
-        const buyerName = (data.overrideName || currentUser.name || '').trim();
-        const buyerClass = (data.overrideClass || currentUser.className || '').trim();
-        const buyerPhone = (data.overridePhone || currentUser.phoneNumber || '').trim();
-        const pickupLoc = (data.pickupLocation || '').trim();
-
-        if (!buyerName || !buyerClass || !buyerPhone) {
-          throw new Error('Thông tin người nhận (tên, lớp, số điện thoại) không được để trống.');
-        }
-
-        if (!pickupLoc) {
-          throw new Error('Vui lòng chọn hoặc nhập nơi nhận hàng.');
-        }
-
         const { fullDescription: expectedDate } = getNextWorkingDay(new Date());
 
         const orderItems: OrderItem[] = productDocs.map((pDoc) => {
@@ -417,12 +453,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             productId: p.id,
             productName: p.name || 'Sản phẩm',
             price: Number(p.price) || 0,
-            imageUrl: p.imageUrl || (p.images && p.images[0]) || '',
-            deliveryPeriod: p.deliveryPeriod || (p.deliveryPeriods && p.deliveryPeriods[0]) || 'Ra chơi sáng'
+            quantity: 1
           };
         });
 
-        const totalAmount = orderItems.reduce((sum, item) => sum + item.price, 0);
+        const totalAmount = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
         
         const newOrderRef = doc(collection(db, 'orders'));
         const orderData: Order = {
@@ -433,7 +468,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           customerPhone: buyerPhone,
           pickupMethod: data.pickupMethod || 'CLASS',
           pickupLocation: pickupLoc,
-          orderNotes: (data.orderNotes || '').trim(),
+          orderNotes,
           createdAt: new Date().toISOString(),
           expectedDeliveryDate: expectedDate,
           status: 'PENDING',
@@ -441,6 +476,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           items: orderItems
         };
 
+        if (getFirestoreDocumentSize(orderData) > MAX_FIRESTORE_DOCUMENT_BYTES) {
+          throw new Error('Thông tin đơn hàng vượt quá 700 KB. Vui lòng rút ngắn ghi chú rồi thử lại.');
+        }
         transaction.set(newOrderRef, orderData);
         return orderData;
       });
@@ -448,7 +486,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCart([]);
       return { success: true, order: newOrder };
     } catch (error: any) {
-      return { success: false, message: error.message || 'Lỗi đặt hàng' };
+      console.error('Create order error:', error);
+      const message = error?.message || '';
+      if (message.startsWith('Sản phẩm') || message.startsWith('Thông tin đơn hàng')) {
+        return { success: false, message };
+      }
+      if (message.includes('size') || message.includes('payload') || message.includes('maximum allowed')) {
+        return { success: false, message: 'Thông tin đơn hàng quá lớn để lưu. Vui lòng kiểm tra ghi chú và thử lại.' };
+      }
+      return { success: false, message: 'Không thể tạo đơn hàng lúc này. Vui lòng thử lại sau.' };
     }
   };
 

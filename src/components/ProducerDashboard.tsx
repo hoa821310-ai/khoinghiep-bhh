@@ -328,7 +328,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
                     <div>
                       <div className="relative aspect-video rounded-2xl overflow-hidden bg-[#F4EEDC] mb-3">
                         <img
-                          src={product.imageUrl || (product.images && product.images[0]) || ''}
+                          src={product.imageUrl || ''}
                           alt={product.name}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover"
@@ -525,11 +525,23 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
                           </a>
                         </td>
                         <td className="py-3 px-4 max-w-[160px]">
-                          {order.items.map((it, i) => (
-                            <div key={i} className="truncate font-semibold text-[#283124]">
-                              • {it.productName}
-                            </div>
-                          ))}
+                          {order.items.map((it, i) => {
+                            const product = products.find(p => p.id === it.productId);
+                            const imageUrl = product?.imageUrl;
+                            const quantity = Number(it.quantity) || 1;
+                            return (
+                              <div key={i} className="flex items-center gap-2 truncate font-semibold text-[#283124]">
+                                {imageUrl ? (
+                                  <img src={imageUrl} alt="" className="w-7 h-7 rounded object-cover border border-[#DED8C5]" />
+                                ) : (
+                                  <span className="w-7 h-7 rounded border border-[#DED8C5] flex items-center justify-center">
+                                    <Package className="w-4 h-4 text-[#707766]" />
+                                  </span>
+                                )}
+                                <span className="truncate">• {it.productName} × {quantity}</span>
+                              </div>
+                            );
+                          })}
                         </td>
                         <td className="py-3 px-3 font-medium text-[#283124] max-w-[140px]">
                           <span className="block truncate font-bold text-[#405B32]">
@@ -543,7 +555,9 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
                         </td>
                         <td className="py-3 px-3 text-[#707766]">
                           <span className="block font-bold text-[#283124]">{order.expectedDeliveryDate}</span>
-                          <span className="text-[10px]">{order.items[0]?.deliveryPeriod}</span>
+                          <span className="text-[10px]">
+                            {products.find(p => p.id === order.items[0]?.productId)?.deliveryPeriod || 'Không còn sản phẩm'}
+                          </span>
                         </td>
                         <td className="py-3 px-3 font-extrabold text-[#405B32]">
                           {formatVND(order.total)}
@@ -603,7 +617,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
                         📍 Nơi nhận: {order.pickupLocation}
                       </p>
                       <p className="text-[#707766]">
-                        🕐 Thời gian: {order.expectedDeliveryDate} — {order.items[0]?.deliveryPeriod}
+                        🕐 Thời gian: {order.expectedDeliveryDate} — {products.find(p => p.id === order.items[0]?.productId)?.deliveryPeriod || 'Không còn sản phẩm'}
                       </p>
                       {order.orderNotes && (
                         <p className="text-[#707766] italic">
@@ -614,12 +628,26 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
 
                     {/* Items */}
                     <div className="space-y-1 text-xs">
-                      {order.items.map((it, idx) => (
-                        <div key={idx} className="flex justify-between">
-                          <span className="font-semibold text-[#283124]">• {it.productName}</span>
-                          <span className="font-bold text-[#405B32]">{formatVND(it.price)}</span>
-                        </div>
-                      ))}
+                      {order.items.map((it, idx) => {
+                        const product = products.find(p => p.id === it.productId);
+                        const imageUrl = product?.imageUrl;
+                        const quantity = Number(it.quantity) || 1;
+                        return (
+                          <div key={idx} className="flex justify-between items-center">
+                            <span className="flex items-center gap-2 font-semibold text-[#283124]">
+                              {imageUrl ? (
+                                <img src={imageUrl} alt="" className="w-7 h-7 rounded object-cover border border-[#DED8C5]" />
+                              ) : (
+                                <span className="w-7 h-7 rounded border border-[#DED8C5] flex items-center justify-center">
+                                  <Package className="w-4 h-4 text-[#707766]" />
+                                </span>
+                              )}
+                              <span>• {it.productName} × {quantity}</span>
+                            </span>
+                            <span className="font-bold text-[#405B32]">{formatVND(it.price * quantity)}</span>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Actions on Mobile */}
@@ -677,7 +705,7 @@ export const ProducerDashboard: React.FC<ProducerDashboardProps> = ({
                   className="bg-[#FFFDF7] rounded-3xl border border-[#DED8C5] p-4 shadow-xs flex items-center gap-3.5"
                 >
                   <img
-                    src={product.imageUrl || (product.images && product.images[0]) || ''}
+                    src={product.imageUrl || ''}
                     alt={product.name}
                     referrerPolicy="no-referrer"
                     className="w-16 h-16 rounded-2xl object-cover grayscale-[40%] border border-[#DED8C5] shrink-0"
