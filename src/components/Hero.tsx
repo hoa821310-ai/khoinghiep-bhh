@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { LeafIllustration, FlowerIllustration, StarSparkle } from './BotanicalDecorations';
-import { ArrowRight, Heart, Calendar, Clock } from 'lucide-react';
+import { ArrowRight, Heart, Calendar, Clock, Truck, ExternalLink } from 'lucide-react';
+
+const OUTSIDE_DELIVERY_INSTAGRAM_URL = 'https://www.instagram.com/bei.handmade.1011/';
 
 interface HeroProps {
   onExplore: () => void;
@@ -8,6 +10,8 @@ interface HeroProps {
 }
 
 export const Hero: React.FC<HeroProps> = ({ onExplore, onAbout }) => {
+  const [showOutsideDelivery, setShowOutsideDelivery] = useState(false);
+
   return (
     <section className="relative px-3 sm:px-6 pt-4 pb-10 sm:pb-16 overflow-hidden">
       <div className="max-w-7xl mx-auto">
@@ -52,7 +56,7 @@ export const Hero: React.FC<HeroProps> = ({ onExplore, onAbout }) => {
             </p>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start justify-center gap-3 sm:gap-4 mb-10">
               <button
                 onClick={onExplore}
                 className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-[#6C9A4A] hover:bg-[#405B32] text-[#FFFDF7] font-bold text-sm sm:text-base transition-all duration-200 shadow-sm hover:shadow active:scale-95 cursor-pointer flex items-center justify-center gap-2"
@@ -61,13 +65,42 @@ export const Hero: React.FC<HeroProps> = ({ onExplore, onAbout }) => {
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              <button
-                onClick={onAbout}
-                className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[#F8F1DF] hover:bg-[#DED8C5] text-[#283124] font-bold text-sm sm:text-base border border-[#DED8C5] transition-all cursor-pointer flex items-center justify-center gap-2"
-              >
-                <Heart className="w-4 h-4 text-[#F28C38]" />
-                <span>Tìm hiểu về CLB</span>
-              </button>
+              <div className="w-full sm:w-[220px] flex flex-col gap-2">
+                <button
+                  onClick={onAbout}
+                  className="w-full min-h-12 px-6 py-3.5 rounded-2xl bg-[#F8F1DF] hover:bg-[#DED8C5] text-[#283124] font-bold text-sm sm:text-base border border-[#DED8C5] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Heart className="w-4 h-4 text-[#F28C38]" />
+                  <span>Tìm hiểu về CLB</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowOutsideDelivery(prev => !prev)}
+                  aria-expanded={showOutsideDelivery}
+                  className="w-full min-h-12 px-6 py-3.5 rounded-2xl bg-[#F8F1DF] hover:bg-[#DED8C5] text-[#283124] font-bold text-sm sm:text-base border border-[#DED8C5] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Truck className="w-4 h-4 text-[#6C9A4A]" />
+                  <span>Giao ngoài trường</span>
+                </button>
+
+                {showOutsideDelivery && (
+                  <div className="w-full p-3 rounded-2xl bg-[#F8F1DF]/70 border border-[#DED8C5] text-left">
+                    <p className="text-xs text-[#707766] leading-relaxed">
+                      Giao ngoài trường: vui lòng nhắn Instagram của CLB để thỏa thuận phí và địa điểm giao.
+                    </p>
+                    <a
+                      href={OUTSIDE_DELIVERY_INSTAGRAM_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#405B32] hover:text-[#6C9A4A] transition-colors"
+                    >
+                      <span>Mở Instagram</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 3 Core Value Pillars */}
