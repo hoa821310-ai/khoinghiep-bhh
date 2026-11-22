@@ -47,7 +47,6 @@ interface FormImageItem {
   id: string;
   previewUrl: string;
   base64: string;
-  needsRecompression: boolean;
   status: 'processing' | 'ready' | 'error';
   errorMsg?: string;
 }
@@ -138,7 +137,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           id: `existing_${i}_${Date.now()}`,
           previewUrl: imgStr,
           base64: imgStr,
-          needsRecompression: imgStr.startsWith('data:image/'),
           status: 'ready'
         })));
         setPrimaryImageIndex(0);
@@ -184,11 +182,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const previewCountdown = calculateRemainingTime(computedTimestamp, clientLocalTime);
 
   // Process File to lightweight permanent Base64 Data URL
-  const processFileToBase64 = (
-    file: File,
-    maxDimension = 600,
-    maxBytes = 100 * 1024
-  ): Promise<string> => {
+  const processFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -201,16 +195,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         img.onload = () => {
           try {
             const canvas = document.createElement('canvas');
+            const MAX_DIM = 1200; // Optimal sharp resolution for high DPI displays
             let width = img.width;
             let height = img.height;
 
-            if (width > maxDimension || height > maxDimension) {
+            if (width > MAX_DIM || height > MAX_DIM) {
               if (width > height) {
-                height = Math.round((height * maxDimension) / width);
-                width = maxDimension;
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
               } else {
-                width = Math.round((width * maxDimension) / height);
-                height = maxDimension;
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
               }
             }
 
@@ -218,34 +213,56 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             if (!ctx) {
+              if (originalDataUrl.length < 800000) {
+                return resolve(originalDataUrl);
+              }
               return reject(new Error('Trình duyệt không hỗ trợ Canvas nén ảnh.'));
             }
 
-            for (const scale of [1, 0.8, 0.6]) {
-              canvas.width = Math.max(1, Math.round(width * scale));
-              canvas.height = Math.max(1, Math.round(height * scale));
-              ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              for (const quality of [0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]) {
-                const resultBase64 = canvas.toDataURL('image/jpeg', quality);
-                const encoded = resultBase64.split(',')[1] || '';
-                const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
-                const imageBytes = Math.floor(encoded.length * 3 / 4) - padding;
-                if (resultBase64.startsWith('data:image/jpeg') && imageBytes < maxBytes) {
-                  return resolve(resultBase64);
-                }
-              }
+            // Fill white background for transparent images
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // 1. Try WebP at 0.82 quality
+            let resultBase64 = canvas.toDataURL('image/webp', 0.82);
+            if (resultBase64 && resultBase64.startsWith('data:image/webp') && resultBase64.length < 800000) {
+              return resolve(resultBase64);
             }
 
-            reject(new Error(`Không thể nén ảnh xuống dưới ${Math.floor(maxBytes / 1024)} KB. Vui lòng chọn ảnh khác.`));
+            // 2. Fallback to JPEG at 0.80 quality
+            resultBase64 = canvas.toDataURL('image/jpeg', 0.80);
+            if (resultBase64 && resultBase64.startsWith('data:image/jpeg') && resultBase64.length < 800000) {
+              return resolve(resultBase64);
+            }
+
+            // 3. Fallback to JPEG at 0.65 quality if still large
+            resultBase64 = canvas.toDataURL('image/jpeg', 0.65);
+            if (resultBase64 && resultBase64.length < 800000) {
+              return resolve(resultBase64);
+            }
+
+            // 4. Fallback to original if under 800KB
+            if (originalDataUrl.length < 800000) {
+              return resolve(originalDataUrl);
+            }
+
+            reject(new Error('Dung lượng ảnh quá lớn (> 800KB). Vui lòng chọn ảnh khác.'));
           } catch (err: any) {
-            reject(new Error(err.message || 'Lỗi khi xử lý nén ảnh.'));
+            if (originalDataUrl && originalDataUrl.length < 800000) {
+              resolve(originalDataUrl);
+            } else {
+              reject(new Error(err.message || 'Lỗi khi xử lý nén ảnh.'));
+            }
           }
         };
 
         img.onerror = () => {
-          reject(new Error('Không thể tải hình ảnh vào bộ nhớ.'));
+          if (originalDataUrl && originalDataUrl.length < 800000) {
+            resolve(originalDataUrl);
+          } else {
+            reject(new Error('Không thể tải hình ảnh vào bộ nhớ.'));
+          }
         };
 
         img.src = originalDataUrl;
@@ -256,24 +273,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     });
   };
 
-  const compressImageSource = async (imageSource: string, maxDimension: number, maxBytes: number) => {
-    let blob: Blob;
-    try {
-      const response = await fetch(imageSource);
-      if (!response.ok) throw new Error('Image fetch failed');
-      blob = await response.blob();
-    } catch {
-      throw new Error('Không thể đọc ảnh để nén lại. Vui lòng chọn ảnh mới.');
-    }
-    return processFileToBase64(new File([blob], 'product-image', { type: blob.type }), maxDimension, maxBytes);
-  };
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    if (formImages.length + files.length > 3) {
-      setErrorMessage('Mỗi sản phẩm chỉ được tải tối đa 3 ảnh.');
+    if (formImages.length + files.length > 4) {
+      setErrorMessage('Mỗi sản phẩm chỉ được tải tối đa 4 ảnh.');
       e.target.value = '';
       return;
     }
@@ -284,7 +289,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const fileList: File[] = Array.from(files);
 
     // Validate file types
-    const nonImageFiles = fileList.filter(f => !['image/png', 'image/jpeg', 'image/webp'].includes(f.type));
+    const nonImageFiles = fileList.filter(f => !f.type.startsWith('image/'));
     if (nonImageFiles.length > 0) {
       setErrorMessage('Chỉ hỗ trợ tệp định dạng hình ảnh (PNG, JPG, JPEG, WEBP).');
       e.target.value = '';
@@ -292,9 +297,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
 
     // Validate file size limit
-    const tooLargeFiles = fileList.filter(f => f.size > 10 * 1024 * 1024);
+    const tooLargeFiles = fileList.filter(f => f.size > 12 * 1024 * 1024);
     if (tooLargeFiles.length > 0) {
-      setErrorMessage('Dung lượng tệp quá lớn (> 10MB). Vui lòng chọn ảnh nhẹ hơn.');
+      setErrorMessage('Dung lượng tệp quá lớn (> 12MB). Vui lòng chọn ảnh nhẹ hơn.');
       e.target.value = '';
       return;
     }
@@ -313,7 +318,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         id: item.id,
         previewUrl: item.previewUrl,
         base64: '',
-        needsRecompression: false,
         status: 'processing' as const
       }))
     ]);
@@ -404,25 +408,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim() || name.trim().length > 200) {
-      setErrorMessage('Tên sản phẩm bắt buộc và không được vượt quá 200 ký tự.');
-      return;
-    }
-    if (description.trim().length > 2000) {
-      setErrorMessage('Mô tả sản phẩm không được vượt quá 2.000 ký tự.');
-      return;
-    }
-
     if (formImages.length === 0) {
       setErrorMessage('Vui lòng tải lên ít nhất 1 ảnh.');
-      return;
-    }
-    if (formImages.length > 3) {
-      setErrorMessage('Mỗi sản phẩm chỉ được lưu tối đa 3 ảnh. Vui lòng xóa bớt ảnh.');
-      return;
-    }
-    if (formImages.length > 3) {
-      setErrorMessage('Mỗi sản phẩm chỉ được lưu tối đa 3 ảnh. Vui lòng xóa bớt ảnh.');
       return;
     }
 
@@ -462,11 +449,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       return;
     }
 
+    // Check total document payload size
+    const totalBytes = readyBase64List.reduce((sum, str) => sum + str.length, 0);
+    console.log("=== THÔNG TIN DỮ LIỆU GỬI LÊN FIRESTORE ===");
+    console.log("Số lượng ảnh:", readyBase64List.length);
+    console.log("Tổng dung lượng Base64:", totalBytes, "bytes (~" + Math.round(totalBytes / 1024) + " KB)");
+    readyBase64List.forEach((b64, i) => {
+      console.log(`- Ảnh ${i + 1}: ${b64.substring(0, 35)}... [${Math.round(b64.length / 1024)} KB]`);
+    });
+
+    if (totalBytes > 900000) {
+      setErrorMessage('Tổng dung lượng các ảnh vượt quá 900KB. Vui lòng giảm bớt ảnh hoặc chọn ảnh nhẹ hơn.');
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage('');
     setSuccessMessage('');
 
     const numPrice = parseInt(price.toString().replace(/\D/g, ''), 10) || 0;
+    const primaryImg = readyBase64List[primaryImageIndex] || readyBase64List[0];
+
     const finalTimestamp = isImmediateSale ? clientLocalTime : computedTimestamp;
     const finalVnTime = formatVietnamTime(finalTimestamp);
     
@@ -475,17 +478,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       : `${finalVnTime.dateStr} – ${finalVnTime.hourMinuteStr}`;
 
     try {
-      const imagesToSave = await Promise.all(formImages
-        .filter(item => item.status === 'ready' && item.base64)
-        .map(item =>
-          item.needsRecompression && item.base64.startsWith('data:image/')
-            ? compressImageSource(item.base64, 600, 100 * 1024)
-            : item.base64
-        )
-      );
-      const primaryImage = imagesToSave[primaryImageIndex] || imagesToSave[0];
-      const primaryImg = await compressImageSource(primaryImage, 300, 30 * 1024);
-
       if (productToEdit) {
         await updateProduct(productToEdit.id, {
           name: name.trim(),
@@ -494,26 +486,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           category,
           openingAt: finalOpeningAt,
           openSaleTimestamp: finalTimestamp,
-          images: imagesToSave,
+          images: readyBase64List,
           imageUrl: primaryImg,
           deliveryPeriods: selectedPeriods,
           deliveryPeriod: selectedPeriods[0]
         });
+        console.log("=== FIRESTORE CẬP NHẬT SẢN PHẨM THÀNH CÔNG ===");
       } else {
-        await addProduct({
+        const created = await addProduct({
           name: name.trim(),
           price: numPrice,
           description: description.trim(),
           category,
           openingAt: finalOpeningAt,
           openSaleTimestamp: finalTimestamp,
-          images: imagesToSave,
+          images: readyBase64List,
           imageUrl: primaryImg,
           deliveryPeriods: selectedPeriods,
           deliveryPeriod: selectedPeriods[0]
         });
+        console.log("=== FIRESTORE TẠO SẢN PHẨM MỚI THÀNH CÔNG ===", created.id);
       }
-      setSuccessMessage('Đăng sản phẩm thành công.');
+      setSuccessMessage('Đăng sản phẩm thành công và đã lưu bền vững vào Firestore.');
       setTimeout(() => {
         onClose();
         setIsSubmitting(false);
@@ -521,16 +515,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     } catch (err: any) {
       console.error("Lỗi Firestore:", err);
       setIsSubmitting(false);
-      if (err.message && (
-        err.message.includes('payload') ||
-        err.message.includes('dung lượng') ||
-        err.message.includes('700 KB') ||
-        err.message.includes('nén') ||
-        err.message.includes('ảnh để nén')
-      )) {
-        setErrorMessage(err.message);
+      if (err.message && err.message.includes('payload')) {
+        setErrorMessage('Dung lượng ảnh quá lớn. Firestore từ chối lưu dữ liệu.');
       } else {
-        setErrorMessage('Không thể lưu sản phẩm. Vui lòng kiểm tra kết nối và thử lại.');
+        setErrorMessage('Lỗi khi lưu sản phẩm vào Firestore: ' + (err.message || 'Lỗi không xác định'));
       }
     }
   };
@@ -583,7 +571,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <span>Hình ảnh sản phẩm (Tải từ máy tính / điện thoại / tablet)</span>
               </label>
               <span className="text-[11px] text-[#707766]">
-                {formImages.length}/3 ảnh đã chọn
+                {formImages.length}/4 ảnh đã chọn
               </span>
             </div>
 
@@ -650,22 +638,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             {/* Upload Button */}
             <label className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 transition-colors text-center ${
-              formImages.length >= 3
+              formImages.length >= 4
                 ? 'border-[#DED8C5] bg-[#F8F1DF]/40 cursor-not-allowed opacity-60'
                 : 'border-[#6C9A4A]/40 hover:border-[#6C9A4A] bg-[#FFFDF7] cursor-pointer'
             }`}>
               <Upload className="w-6 h-6 text-[#6C9A4A]" />
               <span className="text-xs font-bold text-[#283124]">
-                {formImages.length >= 3 ? 'Đã đạt tối đa 3 ảnh' : 'Bấm để chọn hoặc kéo thả ảnh từ thiết bị'}
+                {formImages.length >= 4 ? 'Đã đạt tối đa 4 ảnh' : 'Bấm để chọn hoặc kéo thả ảnh từ thiết bị'}
               </span>
               <span className="text-[10px] text-[#707766]">
-                Hỗ trợ PNG, JPG, JPEG, WEBP (Tối đa 3 ảnh / sản phẩm)
+                Hỗ trợ PNG, JPG, JPEG, WEBP (Tối đa 4 ảnh / sản phẩm)
               </span>
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp"
+                accept="image/*"
                 multiple
-                disabled={formImages.length >= 3}
+                disabled={formImages.length >= 4}
                 onChange={handleImageUpload}
                 className="hidden"
               />
@@ -682,7 +670,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                maxLength={200}
                 required
                 placeholder="Ví dụ: Vòng tay handmade thạch anh"
                 className="w-full px-3.5 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
@@ -1024,7 +1011,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               rows={3}
               value={description}
               onChange={e => setDescription(e.target.value)}
-              maxLength={2000}
               placeholder="Chia sẻ chất liệu, kỹ thuật làm thủ công hoặc ý nghĩa độc bản của tác phẩm..."
               className="w-full px-3.5 py-2.5 bg-[#F8F1DF] border border-[#DED8C5] rounded-xl text-xs sm:text-sm text-[#283124] focus:outline-none focus:border-[#6C9A4A]"
             ></textarea>

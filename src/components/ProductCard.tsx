@@ -29,7 +29,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const { dayName } = getNextWorkingDay(new Date());
 
-  const primaryImage = product.imageUrl || '';
+  const primaryImage = product.imageUrl || (product.images && product.images[0]) || '';
   const displayPeriod = product.deliveryPeriod || (product.deliveryPeriods && product.deliveryPeriods[0]) || 'Ra chơi chiều';
 
   const countdown = product.openSaleTimestamp
